@@ -17,152 +17,158 @@ import NotFoundPage from "./pages/NotFoundPage";
 import PrivateRoute from "./auth/PrivateRoute";
 import SetupProfilePage from "./pages/SetupProfilePage";
 import OfficersManagementPage from "./pages/OfficersManagementPage";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
-    <Routes>
-      {/* Home page - for unauthenticated users */}
-      <Route path="/" element={<HomePage />} />
+    <>
+      <Routes>
+        {/* Home page - for unauthenticated users */}
+        <Route path="/" element={<HomePage />} />
 
-      {/* Public routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      {/* Protected routes with MainLayout */}
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <DashboardPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/setup-profile"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <SetupProfilePage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        {/* Protected routes with MainLayout */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <DashboardPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/setup-profile"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <SetupProfilePage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/programs"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ProgramsPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/programs"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ProgramsPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/applications"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ApplicationsPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/applications"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ApplicationsPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/projects"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ProjectsPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/projects"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ProjectsPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/incentives"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <IncentivesPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/incentives"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <IncentivesPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/compliance"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <CompliancePage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/audit"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <AuditPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/reports"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ReportsPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/compliance"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <CompliancePage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <AuditPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/resources"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ResourcesPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/reports"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ReportsPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/resources"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ResourcesPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
 
-      <Route
-        path="/profile"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <ProfilePage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <ProfilePage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      <Route
-        path="/officers"
-        element={
-          <PrivateRoute>
-            <MainLayout>
-              <OfficersManagementPage />
-            </MainLayout>
-          </PrivateRoute>
-        }
-      />
+        <Route
+          path="/officers"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <OfficersManagementPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
-      {/* Fallback */}
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        {/* Fallback */}
+        <Route path="*" element={<NotFoundPage />} />
+
+      </Routes>
+      <ToastContainer position="top-right" autoClose={3000} />
+    </>
   );
 }
 

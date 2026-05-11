@@ -33,3 +33,5 @@ export const deleteProject = async (projectId) => {
   const res = await api.delete(`/api/projects/deleteById/${projectId}`);
   return res.data;
 };
+
+

@@ -60,3 +60,8 @@ export const getProgramReportMetrics = async () => {
   return res.data;
 };
 
+export const applyToProgram = async (applicationData) => {
+  const res = await api.post("/api/applications/apply", applicationData);
+  return res;
+};
+
