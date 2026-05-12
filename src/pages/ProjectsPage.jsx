@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { fetchAllProjects, createProject } from "../api/projectApi";
+import { fetchAllProjects, createProject, updateProjectStatus } from "../api/projectApi";
 import Loading from "../components/Loading";
 import Alert from "../components/Alert";
+import ContentGate from "../components/ContentGate";
+import ActionButton from "../components/ActionButton";
 
 export default function ProjectsPage() {
     const [projects, setProjects]             = useState([]);
@@ -65,54 +67,61 @@ export default function ProjectsPage() {
                     <h4 className="fw-bold text-success mb-0">Projects</h4>
                     <p className="text-muted small mb-0">Manage sustainability projects</p>
                 </div>
-                <button className="btn btn-success btn-sm" onClick={() => setShowCreateForm(!showCreateForm)}>
+                <ActionButton
+                    roles={["CITIZEN", "BUSINESS_OWNER"]}
+                    className="btn btn-success btn-sm"
+                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    title="Citizens and Business Owners can create projects"
+                >
                     {showCreateForm ? "Cancel" : "+ New Project"}
-                </button>
+                </ActionButton>
             </div>
 
             {error   && <Alert message={error}   type="danger" />}
             {success && <Alert message={success} type="success" />}
 
-            {/* Create Form */}
-            {showCreateForm && (
-                <div className="card border-0 shadow-sm mb-4">
-                    <div className="card-header bg-success text-white border-0">
-                        <h6 className="mb-0">Create New Project</h6>
+            {/* Create Form — CITIZEN / BUSINESS_OWNER only */}
+            <ContentGate roles={["CITIZEN", "BUSINESS_OWNER"]}>
+                {showCreateForm && (
+                    <div className="card border-0 shadow-sm mb-4">
+                        <div className="card-header bg-success text-white border-0">
+                            <h6 className="mb-0">Create New Project</h6>
+                        </div>
+                        <div className="card-body p-4">
+                            <form onSubmit={handleCreateProject}>
+                                <div className="row g-3">
+                                    <div className="col-md-8">
+                                        <label htmlFor="proj-name" className="form-label small fw-semibold">Project Name</label>
+                                        <input id="proj-name" type="text" className="form-control" name="name"
+                                            value={formData.name} onChange={handleInputChange} required />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label htmlFor="proj-program" className="form-label small fw-semibold">Program ID</label>
+                                        <input id="proj-program" type="number" className="form-control" name="programId"
+                                            value={formData.programId} onChange={handleInputChange} required />
+                                    </div>
+                                    <div className="col-12">
+                                        <label htmlFor="proj-desc" className="form-label small fw-semibold">Description</label>
+                                        <textarea id="proj-desc" className="form-control" name="description" rows="2"
+                                            value={formData.description} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label htmlFor="proj-budget" className="form-label small fw-semibold">Budget (INR)</label>
+                                        <input id="proj-budget" type="number" className="form-control" name="budget"
+                                            value={formData.budget} onChange={handleInputChange} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 d-flex gap-2">
+                                    <button type="submit" className="btn btn-success btn-sm" disabled={loading}>
+                                        {loading ? "Creating..." : "Create Project"}
+                                    </button>
+                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    <div className="card-body p-4">
-                        <form onSubmit={handleCreateProject}>
-                            <div className="row g-3">
-                                <div className="col-md-8">
-                                    <label htmlFor="proj-name" className="form-label small fw-semibold">Project Name</label>
-                                    <input id="proj-name" type="text" className="form-control" name="name"
-                                        value={formData.name} onChange={handleInputChange} required />
-                                </div>
-                                <div className="col-md-4">
-                                    <label htmlFor="proj-program" className="form-label small fw-semibold">Program ID</label>
-                                    <input id="proj-program" type="number" className="form-control" name="programId"
-                                        value={formData.programId} onChange={handleInputChange} required />
-                                </div>
-                                <div className="col-12">
-                                    <label htmlFor="proj-desc" className="form-label small fw-semibold">Description</label>
-                                    <textarea id="proj-desc" className="form-control" name="description" rows="2"
-                                        value={formData.description} onChange={handleInputChange} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label htmlFor="proj-budget" className="form-label small fw-semibold">Budget (INR)</label>
-                                    <input id="proj-budget" type="number" className="form-control" name="budget"
-                                        value={formData.budget} onChange={handleInputChange} />
-                                </div>
-                            </div>
-                            <div className="mt-3 d-flex gap-2">
-                                <button type="submit" className="btn btn-success btn-sm" disabled={loading}>
-                                    {loading ? "Creating..." : "Create Project"}
-                                </button>
-                                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                )}
+            </ContentGate>
 
             {/* Projects Table */}
             <div className="card border-0 shadow-sm">
@@ -133,6 +142,9 @@ export default function ProjectsPage() {
                                         <th className="small">Budget</th>
                                         <th className="small">Program ID</th>
                                         <th className="small">Status</th>
+                                        <ContentGate authority="PROGRAM_MANAGER">
+                                            <th className="small text-end pe-4">Actions</th>
+                                        </ContentGate>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -145,6 +157,22 @@ export default function ProjectsPage() {
                                             <td>
                                                 <span className={`badge ${statusBadge(p.status)}`}>{p.status || "PENDING"}</span>
                                             </td>
+                                            <ContentGate authority="PROGRAM_MANAGER">
+                                                <td className="text-end pe-4">
+                                                    <select className="form-select form-select-sm" style={{ width: 130 }}
+                                                        value={p.status || "Pending"}
+                                                        onChange={(e) => {
+                                                            updateProjectStatus(p.id, e.target.value)
+                                                                .then(() => { setSuccess(`Project status updated.`); loadProjects(); })
+                                                                .catch((err) => setError(err.response?.data?.message || "Failed to update status"));
+                                                        }}>
+                                                        <option value="Pending">Pending</option>
+                                                        <option value="APPROVED">Approved</option>
+                                                        <option value="REJECTED">Rejected</option>
+                                                        <option value="ACTIVE">Active</option>
+                                                    </select>
+                                                </td>
+                                            </ContentGate>
                                         </tr>
                                     ))}
                                 </tbody>

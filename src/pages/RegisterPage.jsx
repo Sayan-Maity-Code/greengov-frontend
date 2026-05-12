@@ -3,8 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import Alert from "../components/Alert";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { registerUser } from "../api/authApi";
-import { registerParticipant } from "../api/participantApi";
+import { registerUser, registerOfficer } from "../api/authApi";
 
 export default function RegisterPage() {
     const [activeTab, setActiveTab] = useState("citizen");
@@ -14,50 +13,54 @@ export default function RegisterPage() {
     const navigate = useNavigate();
 
     const [citizenForm, setCitizenForm] = useState({
-        username: "", email: "", password: "", confirmPassword: "",
-        entityType: "CITIZEN", legalName: "", address: "", contactPhone: "",
+        username: "", email: "", password: "", confirmPassword: "", primaryRole: "CITIZEN"
     });
 
     const [officerForm, setOfficerForm] = useState({
-        username: "", email: "", password: "", confirmPassword: "",
-        officerType: "PROGRAM_MANAGER", department: "", designation: "", officeCode: "",
+        username: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        primaryRole: "OFFICER",
+        officerType: "PROGRAM_MANAGER",
+        department: "",
+        designation: ""
     });
 
     const handleCitizenChange = (e) => setCitizenForm({ ...citizenForm, [e.target.name]: e.target.value });
     const handleOfficerChange = (e) => setOfficerForm({ ...officerForm, [e.target.name]: e.target.value });
 
     const validate = (form) => {
-        if (!form.username || !form.email || !form.password) return "All required fields must be filled.";
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return "Invalid email format.";
-        if (form.password.length < 6) return "Password must be at least 6 characters.";
-        if (form.password !== form.confirmPassword) return "Passwords do not match.";
+        if (!form.username || !form.email || !form.password || !form.confirmPassword) {
+            return "All basic fields are required.";
+        }
+        if (form.password !== form.confirmPassword) {
+            return "Passwords do not match.";
+        }
         return null;
     };
 
-    const handleCitizenRegister = async (e) => {
+    const handleCitizenSubmit = async (e) => {
         e.preventDefault();
-        setError(""); setSuccess("");
-        const err = validate(citizenForm);
-        if (err) { setError(err); return; }
+        setError("");
+        setSuccess("");
+        
+        const validationError = validate(citizenForm);
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
 
         try {
             setLoading(true);
-            const authResponse = await registerUser({
+            await registerUser({
                 username: citizenForm.username,
                 email: citizenForm.email,
                 password: citizenForm.password,
-                primaryRole: citizenForm.entityType === "BUSINESS" ? "BUSINESS_OWNER" : "CITIZEN",
+                primaryRole: citizenForm.primaryRole
             });
-            if (authResponse.id || authResponse.userId) {
-                await registerParticipant({
-                    userId: authResponse.id || authResponse.userId,
-                    entityType: citizenForm.entityType,
-                    legalName: citizenForm.legalName,
-                    address: citizenForm.address,
-                    contactInfo: JSON.stringify({ phone: citizenForm.contactPhone, email: citizenForm.email }),
-                });
-            }
-            setSuccess("Registration successful! Redirecting to login...");
+            
+            setSuccess("Account created successfully! Redirecting to login...");
             setTimeout(() => navigate("/login"), 2000);
         } catch (err) {
             setError(err.response?.data?.message || "Registration failed. Please try again.");
@@ -66,112 +69,97 @@ export default function RegisterPage() {
         }
     };
 
-    const handleOfficerRegister = async (e) => {
+    const handleOfficerSubmit = async (e) => {
         e.preventDefault();
-        setError(""); setSuccess("");
-        const err = validate(officerForm);
-        if (err) { setError(err); return; }
-        if (!officerForm.department || !officerForm.designation || !officerForm.officeCode) {
-            setError("All officer fields are required."); return;
+        setError("");
+        setSuccess("");
+        
+        const validationError = validate(officerForm);
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
+        if (!officerForm.department || !officerForm.designation) {
+            setError("Officer type, department, and designation are required.");
+            return;
         }
 
         try {
             setLoading(true);
-            await registerUser({
+            
+            await registerOfficer({
                 username: officerForm.username,
                 email: officerForm.email,
                 password: officerForm.password,
                 primaryRole: "OFFICER",
                 officerType: officerForm.officerType,
                 department: officerForm.department,
-                designation: officerForm.designation,
-                officeCode: officerForm.officeCode,
+                designation: officerForm.designation
             });
-            setSuccess("Officer registration submitted. Awaiting administrator approval.");
-            setTimeout(() => navigate("/login"), 2500);
+            
+            setSuccess("Officer registration successful! Awaiting admin approval. Redirecting to login...");
+            setTimeout(() => navigate("/login"), 2000);
         } catch (err) {
-            setError(err.response?.data?.message || "Registration failed. Please try again.");
+            setError(err.response?.data?.message || "Officer registration failed. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const inputClass = "form-control";
+    const inputClass = "form-control bg-light";
     const labelClass = "form-label fw-semibold small";
 
     return (
         <div className="d-flex flex-column min-vh-100 bg-light">
             <Navbar />
-
-            <div className="flex-grow-1 d-flex align-items-center justify-content-center py-5">
-                <div className="w-100" style={{ maxWidth: 580 }}>
+            <div className="flex-grow-1 d-flex align-items-center justify-content-center p-3">
+                <div className="w-100" style={{ maxWidth: "600px" }}>
                     <div className="text-center mb-4">
-                        <h4 className="fw-bold mb-1">Create an Account</h4>
-                        <p className="text-muted small">Register to access the GreenGov platform</p>
+                        <h2 className="fw-bold text-success mb-1">Join GreenGov</h2>
+                        <p className="text-muted">Create your account to get started</p>
                     </div>
 
-                    <div className="card border-0 shadow-sm">
-                        <div className="card-body p-4">
-                            {error   && <Alert type="danger"  message={error}   onClose={() => setError("")} />}
-                            {success && <Alert type="success" message={success} />}
+                    {error && <Alert type="danger" message={error} />}
+                    {success && <Alert type="success" message={success} />}
 
-                            {/* Tab selector */}
-                            <ul className="nav nav-tabs mb-4">
-                                <li className="nav-item">
-                                    <button
-                                        className={`nav-link ${activeTab === "citizen" ? "active text-success border-bottom border-success border-2" : "text-muted"}`}
-                                        onClick={() => { setActiveTab("citizen"); setError(""); setSuccess(""); }}
-                                    >
-                                        Citizen / Business
-                                    </button>
-                                </li>
-                                <li className="nav-item">
-                                    <button
-                                        className={`nav-link ${activeTab === "officer" ? "active text-success border-bottom border-success border-2" : "text-muted"}`}
-                                        onClick={() => { setActiveTab("officer"); setError(""); setSuccess(""); }}
-                                    >
-                                        Government Officer
-                                    </button>
-                                </li>
-                            </ul>
+                    <div className="card shadow-sm border-0 rounded-3 overflow-hidden">
+                        <div className="d-flex border-bottom bg-white">
+                            <button
+                                className={`btn flex-grow-1 py-3 rounded-0 fw-semibold ${activeTab === "citizen" ? "btn-success" : "btn-light text-muted border-end"}`}
+                                onClick={() => setActiveTab("citizen")}
+                            >
+                                Citizen / Business
+                            </button>
+                            <button
+                                className={`btn flex-grow-1 py-3 rounded-0 fw-semibold ${activeTab === "officer" ? "btn-success" : "btn-light text-muted"}`}
+                                onClick={() => setActiveTab("officer")}
+                            >
+                                Government Officer
+                            </button>
+                        </div>
 
-                            {/* Citizen Form */}
-                            {activeTab === "citizen" && (
-                                <form onSubmit={handleCitizenRegister}>
+                        <div className="p-4">
+                            {activeTab === "citizen" ? (
+                                <form onSubmit={handleCitizenSubmit}>
                                     <div className="row g-3">
-                                        <div className="col-md-6">
+                                        <div className="col-12">
+                                            <label htmlFor="primaryRole" className={labelClass}>Register As</label>
+                                            <select id="primaryRole" className={inputClass} name="primaryRole"
+                                                value={citizenForm.primaryRole} onChange={handleCitizenChange} required>
+                                                <option value="CITIZEN">Citizen</option>
+                                                <option value="BUSINESS_OWNER">Business Owner</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-12">
                                             <label htmlFor="cUsername" className={labelClass}>Username</label>
                                             <input id="cUsername" type="text" className={inputClass} name="username"
                                                 value={citizenForm.username} onChange={handleCitizenChange} required />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label htmlFor="cEntityType" className={labelClass}>Entity Type</label>
-                                            <select id="cEntityType" className="form-select" name="entityType"
-                                                value={citizenForm.entityType} onChange={handleCitizenChange}>
-                                                <option value="CITIZEN">Citizen</option>
-                                                <option value="BUSINESS">Business</option>
-                                            </select>
                                         </div>
                                         <div className="col-12">
                                             <label htmlFor="cEmail" className={labelClass}>Email Address</label>
                                             <input id="cEmail" type="email" className={inputClass} name="email"
                                                 value={citizenForm.email} onChange={handleCitizenChange} required />
-                                        </div>
-                                        <div className="col-12">
-                                            <label htmlFor="cLegalName" className={labelClass}>Legal Name / Organisation</label>
-                                            <input id="cLegalName" type="text" className={inputClass} name="legalName"
-                                                value={citizenForm.legalName} onChange={handleCitizenChange} required />
-                                        </div>
-                                        <div className="col-12">
-                                            <label htmlFor="cAddress" className={labelClass}>Address</label>
-                                            <textarea id="cAddress" className={inputClass} name="address"
-                                                value={citizenForm.address} onChange={handleCitizenChange} rows="2" required />
-                                        </div>
-                                        <div className="col-12">
-                                            <label htmlFor="cPhone" className={labelClass}>Contact Phone</label>
-                                            <input id="cPhone" type="tel" className={inputClass} name="contactPhone"
-                                                value={citizenForm.contactPhone} onChange={handleCitizenChange}
-                                                placeholder="+91-9876543210" />
                                         </div>
                                         <div className="col-md-6">
                                             <label htmlFor="cPassword" className={labelClass}>Password</label>
@@ -185,17 +173,11 @@ export default function RegisterPage() {
                                         </div>
                                     </div>
                                     <button type="submit" className="btn btn-success w-100 mt-4" disabled={loading}>
-                                        {loading ? <><span className="spinner-border spinner-border-sm me-2" role="status"></span>Registering...</> : "Register"}
+                                        {loading ? <><span className="spinner-border spinner-border-sm me-2" role="status"></span>Submitting...</> : "Create Account"}
                                     </button>
                                 </form>
-                            )}
-
-                            {/* Officer Form */}
-                            {activeTab === "officer" && (
-                                <form onSubmit={handleOfficerRegister}>
-                                    <div className="alert alert-warning border-warning small py-2">
-                                        Officer accounts require administrator approval before access is granted.
-                                    </div>
+                            ) : (
+                                <form onSubmit={handleOfficerSubmit}>
                                     <div className="row g-3">
                                         <div className="col-md-6">
                                             <label htmlFor="oUsername" className={labelClass}>Username</label>
@@ -203,9 +185,14 @@ export default function RegisterPage() {
                                                 value={officerForm.username} onChange={handleOfficerChange} required />
                                         </div>
                                         <div className="col-md-6">
-                                            <label htmlFor="oOfficerType" className={labelClass}>Officer Type</label>
-                                            <select id="oOfficerType" className="form-select" name="officerType"
-                                                value={officerForm.officerType} onChange={handleOfficerChange}>
+                                            <label htmlFor="oEmail" className={labelClass}>Email Address</label>
+                                            <input id="oEmail" type="email" className={inputClass} name="email"
+                                                value={officerForm.email} onChange={handleOfficerChange} required />
+                                        </div>
+                                        <div className="col-md-6">
+                                            <label htmlFor="officerType" className={labelClass}>Officer Type</label>
+                                            <select id="officerType" className={inputClass} name="officerType"
+                                                value={officerForm.officerType} onChange={handleOfficerChange} required>
                                                 <option value="PROGRAM_MANAGER">Program Manager</option>
                                                 <option value="COMPLIANCE_OFFICER">Compliance Officer</option>
                                                 <option value="ENVIRONMENT_OFFICER">Environment Officer</option>
@@ -213,28 +200,15 @@ export default function RegisterPage() {
                                                 <option value="AUDIT_MANAGER">Audit Manager</option>
                                             </select>
                                         </div>
-                                        <div className="col-12">
-                                            <label htmlFor="oEmail" className={labelClass}>Official Email</label>
-                                            <input id="oEmail" type="email" className={inputClass} name="email"
-                                                value={officerForm.email} onChange={handleOfficerChange} required />
+                                        <div className="col-md-6">
+                                            <label htmlFor="department" className={labelClass}>Department</label>
+                                            <input id="department" type="text" className={inputClass} name="department"
+                                                value={officerForm.department} onChange={handleOfficerChange} required />
                                         </div>
                                         <div className="col-md-6">
-                                            <label htmlFor="oDepartment" className={labelClass}>Department</label>
-                                            <input id="oDepartment" type="text" className={inputClass} name="department"
-                                                value={officerForm.department} onChange={handleOfficerChange}
-                                                placeholder="e.g. Green Programs Division" required />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label htmlFor="oDesignation" className={labelClass}>Designation</label>
-                                            <input id="oDesignation" type="text" className={inputClass} name="designation"
-                                                value={officerForm.designation} onChange={handleOfficerChange}
-                                                placeholder="e.g. Program Manager" required />
-                                        </div>
-                                        <div className="col-12">
-                                            <label htmlFor="oOfficeCode" className={labelClass}>Office Code</label>
-                                            <input id="oOfficeCode" type="text" className={inputClass} name="officeCode"
-                                                value={officerForm.officeCode} onChange={handleOfficerChange}
-                                                placeholder="e.g. PRG-MGR-015" required />
+                                            <label htmlFor="designation" className={labelClass}>Designation</label>
+                                            <input id="designation" type="text" className={inputClass} name="designation"
+                                                value={officerForm.designation} onChange={handleOfficerChange} required />
                                         </div>
                                         <div className="col-md-6">
                                             <label htmlFor="oPassword" className={labelClass}>Password</label>
@@ -261,7 +235,6 @@ export default function RegisterPage() {
                     </p>
                 </div>
             </div>
-
             <Footer />
         </div>
     );

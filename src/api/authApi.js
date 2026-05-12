@@ -28,4 +28,4 @@ export const registerOfficer = async (payload) => {
         primaryRole: "OFFICER"
     });
     return res.data;
-}
+};

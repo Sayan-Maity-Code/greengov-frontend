@@ -1,30 +1,30 @@
 import api from "./api";
 
-// Register participant (citizen/business)
 export const registerParticipant = async (payload) => {
   const res = await api.post("/api/participants/register", payload);
   return res.data;
 };
 
-// Get participant by ID
 export const getParticipantById = async (participantId) => {
   const res = await api.get(`/api/participants/${participantId}`);
   return res.data;
 };
 
-// Update participant profile
+export const getParticipantByUserId = async (userId) => {
+  const res = await api.get(`/api/participants/user/${userId}`);
+  return res.data;
+};
+
 export const updateParticipant = async (participantId, payload) => {
   const res = await api.put(`/api/participants/${participantId}`, payload);
   return res.data;
 };
 
-// Get participant documents
 export const getParticipantDocuments = async (participantId) => {
   const res = await api.get(`/api/participants/${participantId}/documents`);
   return res.data;
 };
 
-// Upload document
 export const uploadDocument = async (participantId, payload) => {
   const res = await api.post(
     `/api/participants/${participantId}/documents`,
@@ -33,7 +33,12 @@ export const uploadDocument = async (participantId, payload) => {
   return res.data;
 };
 
-// Update document status
+// Fetch all participants for the Compliance Dashboard
+export const getAllParticipants = async () => {
+  // Assuming your axios instance is named 'api'. Adjust if it's named 'axiosInstance' or similar.
+  const response = await api.get('/api/participants'); 
+  return response.data;
+};
 export const updateDocumentStatus = async (
   participantId,
   documentId,
@@ -46,7 +51,6 @@ export const updateDocumentStatus = async (
   return res.data;
 };
 
-// Update participant verification status
 export const updateParticipantVerificationStatus = async (
   participantId,
   status

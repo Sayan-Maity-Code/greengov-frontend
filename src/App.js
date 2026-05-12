@@ -15,6 +15,12 @@ import ReportsPage from "./pages/ReportsPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import PrivateRoute from "./auth/PrivateRoute";
+import SetupProfilePage from "./pages/SetupProfilePage";
+import OfficersManagementPage from "./pages/OfficersManagementPage";
+import EnvironmentalDashboard from './pages/EnvironmentalDashboard';
+
+// 🚀 Add this import for your secure officer guard!
+import OfficerRoute from "./auth/OfficerRoute"; 
 
 function App() {
   return (
@@ -33,6 +39,16 @@ function App() {
           <PrivateRoute>
             <MainLayout>
               <DashboardPage />
+            </MainLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/setup-profile"
+        element={
+          <PrivateRoute>
+            <MainLayout>
+              <SetupProfilePage />
             </MainLayout>
           </PrivateRoute>
         }
@@ -134,6 +150,29 @@ function App() {
               <ProfilePage />
             </MainLayout>
           </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/officers"
+        element={
+          <PrivateRoute>
+            <MainLayout>
+              <OfficersManagementPage />
+            </MainLayout>
+          </PrivateRoute>
+        }
+      />
+
+      {/* 🌿 THE MISSING ROUTE: Secure Officer Dashboard */}
+      <Route
+        path="/officer-dashboard"
+        element={
+          <OfficerRoute>
+            <MainLayout>
+              <EnvironmentalDashboard />
+            </MainLayout>
+          </OfficerRoute>
         }
       />
 

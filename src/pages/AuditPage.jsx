@@ -1,228 +1,313 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
-    createAudit, getAuditsByStatus, getAuditsByComplianceId,
-    getAuditsByOfficerId, closeAudit,
+  createAudit,
+  getAuditsByStatus,
+  getAuditsByComplianceId,
+  closeAudit,
+  getComplianceLookup,
 } from "../api/auditApi";
+
 import Loading from "../components/Loading";
 import Alert from "../components/Alert";
-import { RequiredPermission } from "../components/PermissionGate";
+import ContentGate from "../components/ContentGate";
+import ActionButton from "../components/ActionButton";
 import { useAuth } from "../auth/AuthContext";
 
 export default function AuditPage() {
-    const { getUserId } = useAuth();
-    const [audits, setAudits]                 = useState([]);
-    const [loading, setLoading]               = useState(false);
-    const [error, setError]                   = useState("");
-    const [success, setSuccess]               = useState("");
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [filterType, setFilterType]         = useState("all");
-    const [filterValue, setFilterValue]       = useState("");
+  const { getUserId } = useAuth();
 
-    const [formData, setFormData] = useState({ complianceId: "" });
+  /* ================= STATE ================= */
+  const [audits, setAudits] = useState([]);
+  const [compliances, setCompliances] = useState([]);
 
-    const loadAudits = useCallback(async () => {
-        try {
-            setLoading(true);
-            let data = [];
-            if (filterType === "status" && filterValue) data = await getAuditsByStatus(filterValue);
-            else if (filterType === "compliance" && filterValue) data = await getAuditsByComplianceId(filterValue);
-            else if (filterType === "officer" && filterValue) data = await getAuditsByOfficerId(filterValue);
-            setAudits(data || []);
-            setError("");
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to load audits");
-        } finally {
-            setLoading(false);
-        }
-    }, [filterType, filterValue]);
+  const [loading, setLoading] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
-    useEffect(() => { loadAudits(); }, [loadAudits]);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-    const handleCreate = async (e) => {
-        e.preventDefault();
-        setError(""); setSuccess("");
-        if (!formData.complianceId) { setError("Compliance ID is required."); return; }
-        try {
-            setLoading(true);
-            await createAudit({ complianceId: Number(formData.complianceId) }, getUserId());
-            setSuccess("Audit created successfully.");
-            setFormData({ complianceId: "" });
-            setShowCreateForm(false);
-            loadAudits();
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to create audit");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const [formData, setFormData] = useState({
+    complianceId: "",
+  });
 
-    const handleClose = async (auditId) => {
-        setError(""); setSuccess("");
-        try {
-            setLoading(true);
-            await closeAudit(auditId, "COMPLETED", getUserId());
-            setSuccess("Audit closed successfully.");
-            loadAudits();
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to close audit");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const [filter, setFilter] = useState({
+    type: "all", // all | status | compliance
+    value: "",
+  });
 
-    const statusBadge = (status) => {
-        if (status === "COMPLETED") return "bg-success";
-        if (status === "IN_PROGRESS") return "bg-info text-dark";
-        if (status === "PENDING") return "bg-warning text-dark";
-        return "bg-secondary";
-    };
+  /* ================= LOAD COMPLIANCE LOOKUP ================= */
 
-    if (loading && audits.length === 0) return <Loading />;
+  const loadComplianceLookup = async () => {
+    try {
+      setLookupLoading(true);
+      const data = await getComplianceLookup();
+      setCompliances(data || []);
+    } catch {
+      setError("Failed to load compliance list");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
 
-    return (
-        <RequiredPermission authority="AUDIT_MANAGER" message="Only Audit Managers can access this page.">
-            <div>
-                {/* Page header */}
-                <div className="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom">
-                    <div>
-                        <h4 className="fw-bold text-success mb-0">Audit Management</h4>
-                        <p className="text-muted small mb-0">Create and manage compliance audits</p>
-                    </div>
-                    <button className="btn btn-success btn-sm" onClick={() => setShowCreateForm(!showCreateForm)}>
-                        {showCreateForm ? "Cancel" : "+ Create Audit"}
-                    </button>
-                </div>
+  useEffect(() => {
+    if (showCreateForm || filter.type === "compliance") {
+      loadComplianceLookup();
+    }
+  }, [showCreateForm, filter.type]);
 
-                {error   && <Alert message={error}   type="danger" />}
-                {success && <Alert message={success} type="success" />}
+  /* ================= LOAD AUDITS ================= */
 
-                {/* Create Form */}
-                {showCreateForm && (
-                    <div className="card border-0 shadow-sm mb-4">
-                        <div className="card-header bg-success text-white border-0">
-                            <h6 className="mb-0">Create New Audit</h6>
-                        </div>
-                        <div className="card-body p-4">
-                            <form onSubmit={handleCreate}>
-                                <div className="row g-3">
-                                    <div className="col-md-4">
-                                        <label htmlFor="audit-complianceId" className="form-label small fw-semibold">
-                                            Compliance Record ID
-                                        </label>
-                                        <input id="audit-complianceId" type="number" className="form-control"
-                                            name="complianceId" value={formData.complianceId}
-                                            onChange={(e) => setFormData({ complianceId: e.target.value })}
-                                            placeholder="Enter compliance record ID" required />
-                                    </div>
-                                </div>
-                                <div className="mt-3 d-flex gap-2">
-                                    <button type="submit" className="btn btn-success btn-sm" disabled={loading}>
-                                        {loading ? "Creating..." : "Create Audit"}
-                                    </button>
-                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
+  const loadAudits = async () => {
+    try {
+      setLoading(true);
+      let data = [];
 
-                {/* Filter */}
-                <div className="card border-0 shadow-sm mb-4">
-                    <div className="card-header bg-white border-bottom">
-                        <h6 className="mb-0 fw-semibold">Filter Audits</h6>
-                    </div>
-                    <div className="card-body p-3">
-                        <div className="row g-3 align-items-end">
-                            <div className="col-md-3">
-                                <label className="form-label small fw-semibold">Filter By</label>
-                                <select className="form-select form-select-sm" value={filterType}
-                                    onChange={(e) => { setFilterType(e.target.value); setFilterValue(""); }}>
-                                    <option value="all">All Audits</option>
-                                    <option value="status">Status</option>
-                                    <option value="compliance">Compliance Record ID</option>
-                                    <option value="officer">Officer ID</option>
-                                </select>
-                            </div>
-                            {filterType === "status" && (
-                                <div className="col-md-3">
-                                    <label className="form-label small fw-semibold">Status</label>
-                                    <select className="form-select form-select-sm" value={filterValue}
-                                        onChange={(e) => setFilterValue(e.target.value)}>
-                                        <option value="">Select status</option>
-                                        <option value="COMPLETED">Completed</option>
-                                        <option value="IN_PROGRESS">In Progress</option>
-                                        <option value="PENDING">Pending</option>
-                                    </select>
-                                </div>
-                            )}
-                            {filterType !== "all" && filterType !== "status" && (
-                                <div className="col-md-3">
-                                    <label className="form-label small fw-semibold">
-                                        {filterType === "compliance" ? "Compliance ID" : "Officer ID"}
-                                    </label>
-                                    <input type="number" className="form-control form-control-sm" value={filterValue}
-                                        onChange={(e) => setFilterValue(e.target.value)} placeholder="Enter ID" />
-                                </div>
-                            )}
-                            <div className="col-md-2">
-                                <button className="btn btn-success btn-sm w-100" onClick={loadAudits} disabled={loading}>
-                                    Search
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      if (filter.type === "status" && filter.value) {
+        data = await getAuditsByStatus(filter.value);
+      } else if (filter.type === "compliance" && filter.value) {
+        data = await getAuditsByComplianceId(filter.value);
+      }
 
-                {/* Audits Table */}
-                <div className="card border-0 shadow-sm">
-                    <div className="card-header bg-white border-bottom">
-                        <h6 className="mb-0 fw-semibold">Audit Records</h6>
-                    </div>
-                    <div className="card-body p-0">
-                        {audits.length === 0 ? (
-                            <p className="text-muted text-center py-5 mb-0">
-                                {filterType === "all" ? "Use the filter above to search for audit records" : "No audits found"}
-                            </p>
-                        ) : (
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle mb-0">
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th className="ps-4 small">Audit ID</th>
-                                            <th className="small">Compliance ID</th>
-                                            <th className="small">Auditor ID</th>
-                                            <th className="small">Status</th>
-                                            <th className="small">Created</th>
-                                            <th className="small text-end pe-4">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {audits.map((a) => (
-                                            <tr key={a.id}>
-                                                <td className="ps-4 small fw-semibold">{a.id}</td>
-                                                <td className="small">{a.complianceId}</td>
-                                                <td className="small">{a.auditorId || "—"}</td>
-                                                <td><span className={`badge ${statusBadge(a.status)}`}>{a.status || "PENDING"}</span></td>
-                                                <td className="small text-muted">
-                                                    {a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "—"}
-                                                </td>
-                                                <td className="text-end pe-4">
-                                                    {a.status !== "COMPLETED" && (
-                                                        <button className="btn btn-success btn-sm"
-                                                            onClick={() => handleClose(a.id)} disabled={loading}>
-                                                            Close
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
+      setAudits(data || []);
+      setError("");
+    } catch {
+      setError("Failed to load audits");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= HANDLERS ================= */
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!formData.complianceId) {
+      setError("Please select a compliance record");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createAudit(
+        { complianceId: formData.complianceId },
+        getUserId()
+      );
+      setSuccess("Audit created successfully");
+      setFormData({ complianceId: "" });
+      setShowCreateForm(false);
+      loadAudits();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create audit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = async (auditId) => {
+    try {
+      setLoading(true);
+      await closeAudit(auditId, "COMPLETED", getUserId());
+      setSuccess("Audit closed successfully");
+      loadAudits();
+    } catch {
+      setError("Failed to close audit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statusBadge = (status) =>
+    status === "COMPLETED"
+      ? "bg-success"
+      : status === "IN_PROGRESS"
+      ? "bg-info text-dark"
+      : "bg-secondary";
+
+  if (loading && audits.length === 0) return <Loading />;
+
+  /* ================= UI ================= */
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+          <h4 className="fw-bold text-success">Audit Management</h4>
+          <p className="text-muted small mb-0">
+            Create and manage compliance audits
+          </p>
+        </div>
+        <ActionButton
+          authority="AUDIT_MANAGER"
+          className="btn btn-success btn-sm"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+        >
+          {showCreateForm ? "Cancel" : "+ Create Audit"}
+        </ActionButton>
+      </div>
+
+      {error && <Alert message={error} type="danger" />}
+      {success && <Alert message={success} type="success" />}
+
+      {/* ================= CREATE AUDIT ================= */}
+      <ContentGate authority="AUDIT_MANAGER">
+        {showCreateForm && (
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-success text-white">
+              Create Audit
             </div>
-        </RequiredPermission>
-    );
+            <div className="card-body">
+              <form onSubmit={handleCreate}>
+                <label className="form-label">Compliance</label>
+                <select
+                  className="form-select"
+                  value={formData.complianceId}
+                  onChange={(e) =>
+                    setFormData({ complianceId: e.target.value })
+                  }
+                  required
+                  disabled={lookupLoading}
+                >
+                  <option value="">
+                    {lookupLoading
+                      ? "Loading compliances..."
+                      : "Select Compliance"}
+                  </option>
+                  {compliances.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="mt-3">
+                  <button className="btn btn-success btn-sm" type="submit">
+                    Create Audit
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </ContentGate>
+
+      {/* ================= FILTER ================= */}
+      <div className="card shadow-sm mb-4">
+        <div className="card-header">Filter Audits</div>
+        <div className="card-body row g-3 align-items-end">
+          <div className="col-md-4">
+            <label className="form-label">Filter By</label>
+            <select
+              className="form-select form-select-sm"
+              value={filter.type}
+              onChange={(e) =>
+                setFilter({ type: e.target.value, value: "" })
+              }
+            >
+              <option value="all">All</option>
+              <option value="status">Status</option>
+              <option value="compliance">Compliance</option>
+            </select>
+          </div>
+
+          {filter.type === "status" && (
+            <div className="col-md-4">
+              <label className="form-label">Status</label>
+              <select
+                className="form-select form-select-sm"
+                value={filter.value}
+                onChange={(e) =>
+                  setFilter({ ...filter, value: e.target.value })
+                }
+              >
+                <option value="">Select</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+          )}
+
+          {filter.type === "compliance" && (
+            <div className="col-md-4">
+              <label className="form-label">Compliance</label>
+              <select
+                className="form-select form-select-sm"
+                value={filter.value}
+                onChange={(e) =>
+                  setFilter({ ...filter, value: e.target.value })
+                }
+              >
+                <option value="">Select</option>
+                {compliances.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="col-md-2">
+            <button
+              className="btn btn-success btn-sm w-100"
+              onClick={loadAudits}
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= TABLE ================= */}
+      <div className="card shadow-sm">
+        <div className="card-header">Audit Records</div>
+        <div className="card-body p-0">
+          {audits.length === 0 ? (
+            <p className="text-center text-muted py-4 mb-0">
+              No audits found
+            </p>
+          ) : (
+            <table className="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Audit ID</th>
+                  <th>Compliance ID</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audits.map((a) => (
+                  <tr key={a.id}>
+                    <td>{a.id}</td>
+                    <td>{a.complianceId}</td>
+                    <td>
+                      <span className={`badge ${statusBadge(a.status)}`}>
+                        {a.status}
+                      </span>
+                    </td>
+                    <td>
+                      {a.status !== "COMPLETED" && (
+                        <ActionButton
+                          authority="AUDIT_MANAGER"
+                          className="btn btn-success btn-sm"
+                          onClick={() => handleClose(a.id)}
+                        >
+                          Close
+                        </ActionButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

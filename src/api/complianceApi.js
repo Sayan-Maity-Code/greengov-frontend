@@ -8,7 +8,7 @@ export const createCompliance = async (payload, officerUserId) => {
   return res.data;
 };
 
-// Get compliance by subject (PROJECT or APPLICATION)
+// Get compliance by subject (PROJECT,PROGRAM,INCENTIVE)
 export const getComplianceBySubject = async (subjectType, subjectId) => {
   const res = await api.get("/api/compliance/subject", {
     params: { subjectType, subjectId },
@@ -16,8 +16,19 @@ export const getComplianceBySubject = async (subjectType, subjectId) => {
   return res.data;
 };
 
-// Get compliance records by participant
-export const getComplianceByParticipant = async (participantId) => {
-  const res = await api.get(`/api/compliance/participant/${participantId}`);
+
+// Subject lookups
+export const getProjectSubjects = async () => {
+  const res = await api.get("/api/compliance/subjects/projects");
+  return res.data;
+};
+
+export const getProgramSubjects = async () => {
+  const res = await api.get("/api/compliance/subjects/programs");
+  return res.data;
+};
+
+export const getIncentiveSubjects = async () => {
+  const res = await api.get("/api/compliance/subjects/incentives");
   return res.data;
 };

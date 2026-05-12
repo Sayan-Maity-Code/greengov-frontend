@@ -5,6 +5,7 @@ import { loginUser, loginAdmin } from "../api/authApi";
 import { useAuth } from "../auth/AuthContext";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { getParticipantByUserId } from "../api/participantApi";
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -20,14 +21,73 @@ export default function LoginPage() {
         e.preventDefault();
         setError("");
         setLoading(true);
+        
         try {
             const data = isAdmin
                 ? await loginAdmin(username, password)
                 : await loginUser(username, password);
-            login(data.token);
-            navigate("/dashboard");
+
+            const token = data.token || data;
+
+            let currentUserId = data.id || data.userId;
+            let decodedUsername = data.username || username;
+            let isOfficer = false; // 🚀 New flag to protect Officers
+
+            if (typeof token === "string") {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    currentUserId = payload.userId || payload.id || currentUserId;
+                    decodedUsername = payload.username || payload.sub || username;
+                    
+                    // 🚀 Check if the token belongs to an Officer
+                    const roles = payload.roles || [];
+                    if (roles.includes("ROLE_OFFICER") || roles.includes("OFFICER")) {
+                        isOfficer = true;
+                    }
+                } catch (decodeErr) {
+                    if (!isAdmin) throw new Error("Invalid token received from server.");
+                }
+            }
+
+            if (isAdmin && !currentUserId) {
+                currentUserId = "admin-sys-id"; 
+            }
+
+            if (!currentUserId && !isAdmin && !isOfficer) {
+                throw new Error("Could not extract User ID. Please try logging in again.");
+            }
+
+            localStorage.setItem("token", token);
+            localStorage.setItem("userData", JSON.stringify({
+                id: currentUserId,
+                username: decodedUsername,
+                email: data.email || "",
+                isAdmin: isAdmin 
+            }));
+
+            // 🚀 THE FIX: If they are Admin OR Officer, skip the DB check and go to profile!
+            if (isAdmin || isOfficer) {
+                login(token);
+                navigate("/profile");
+            } else {
+                // 👤 Only Citizens and Businesses do the DB check
+                try {
+                    await getParticipantByUserId(currentUserId);
+                    login(token);
+                    navigate("/profile");
+                } catch (profileError) {
+                    if (profileError.response && profileError.response.status === 404) {
+                        login(token);
+                        navigate("/setup-profile");
+                        return;
+                    } else {
+                        login(token);
+                        navigate("/profile");
+                    }
+                }
+            }
         } catch (err) {
-            setError(err.response?.data?.message || "Invalid credentials. Please try again.");
+            setError(err.response?.data?.message || err.message || "Invalid credentials.");
         } finally {
             setLoading(false);
         }
@@ -36,78 +96,70 @@ export default function LoginPage() {
     return (
         <div className="d-flex flex-column min-vh-100 bg-light">
             <Navbar />
-
-            <div className="flex-grow-1 d-flex align-items-center justify-content-center py-5">
-                <div className="w-100" style={{ maxWidth: 420 }}>
-                    {/* Header */}
+            <div className="flex-grow-1 d-flex align-items-center justify-content-center p-3">
+                <div className="w-100" style={{ maxWidth: "400px" }}>
                     <div className="text-center mb-4">
-                        <div className="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                            style={{ width: 56, height: 56 }}>
-                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                            </svg>
-                        </div>
-                        <h4 className="fw-bold mb-1">Sign In to GreenGov</h4>
-                        <p className="text-muted small">Enter your credentials to continue</p>
+                        <h2 className="fw-bold text-success mb-1">GreenGov</h2>
+                        <p className="text-muted">Sign in to your account</p>
                     </div>
 
-                    <div className="card border-0 shadow-sm">
-                        <div className="card-body p-4">
-                            {error && <Alert type="danger" message={error} onClose={() => setError("")} />}
+                    {error && <Alert type="danger" message={error} />}
 
-                            <form onSubmit={handleSubmit}>
-                                <div className="mb-3">
-                                    <label htmlFor="login-username" className="form-label fw-semibold small">Username</label>
-                                    <input
-                                        id="login-username"
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="Enter your username"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                        autoComplete="username"
-                                    />
-                                </div>
+                    <div className="card shadow-sm border-0 rounded-3 p-4">
+                        <form onSubmit={handleSubmit}>
+                            <div className="mb-3">
+                                <label htmlFor="username" className="form-label fw-semibold small">
+                                    Username
+                                </label>
+                                <input
+                                    id="username"
+                                    type="text"
+                                    className="form-control bg-light"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    required
+                                    autoComplete="username"
+                                />
+                            </div>
 
-                                <div className="mb-3">
-                                    <label htmlFor="login-password" className="form-label fw-semibold small">Password</label>
-                                    <input
-                                        id="login-password"
-                                        type="password"
-                                        className="form-control"
-                                        placeholder="Enter your password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                        autoComplete="current-password"
-                                    />
-                                </div>
+                            <div className="mb-4">
+                                <label htmlFor="password" className="form-label fw-semibold small mb-0">
+                                    Password
+                                </label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    className="form-control bg-light mt-2"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    autoComplete="current-password"
+                                />
+                            </div>
 
-                                <div className="form-check mb-4">
-                                    <input
-                                        className="form-check-input"
-                                        type="checkbox"
-                                        id="adminCheck"
-                                        checked={isAdmin}
-                                        onChange={(e) => setIsAdmin(e.target.checked)}
-                                    />
-                                    <label className="form-check-label small text-muted" htmlFor="adminCheck">
-                                        Sign in as Administrator
-                                    </label>
-                                </div>
+                            <div className="form-check mb-4">
+                                <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id="adminCheck"
+                                    checked={isAdmin}
+                                    onChange={(e) => setIsAdmin(e.target.checked)}
+                                />
+                                <label className="form-check-label small text-muted" htmlFor="adminCheck">
+                                    Sign in as Administrator
+                                </label>
+                            </div>
 
-                                <button
-                                    type="submit"
-                                    className="btn btn-success w-100"
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing in...</span>
-                                    ) : "Sign In"}
-                                </button>
-                            </form>
-                        </div>
+                            <button
+                                type="submit"
+                                className="btn btn-success w-100"
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing in...</span>
+                                ) : "Sign In"}
+                            </button>
+                        </form>
                     </div>
 
                     <p className="text-center text-muted small mt-3">
@@ -118,7 +170,6 @@ export default function LoginPage() {
                     </p>
                 </div>
             </div>
-
             <Footer />
         </div>
     );

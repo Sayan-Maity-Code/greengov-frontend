@@ -1,195 +1,359 @@
 import { useState, useEffect, useCallback } from "react";
-import { getParticipantById, updateParticipant, getParticipantDocuments } from "../api/participantApi";
+import { getParticipantByUserId, updateParticipant, getParticipantDocuments } from "../api/participantApi";
 import Loading from "../components/Loading";
 import Alert from "../components/Alert";
-import { useAuth } from "../auth/AuthContext";
+import DocumentUploadModal from "../components/DocumentUploadModal";
 
 export default function ProfilePage() {
-    const { getUserId, getUsername, getRoles, getAuthorities } = useAuth();
-    const userId   = getUserId();
-    const username = getUsername();
-    const roles    = getRoles();
-    const authorities = getAuthorities();
+    const user = JSON.parse(localStorage.getItem("userData") || "{}");
+    const token = localStorage.getItem("token") || "";
+    const currentUserId = user.id || user.userId;
 
-    const [profile, setProfile]   = useState({});
+    const [profileType, setProfileType] = useState("CITIZEN");
+    const [profile, setProfile] = useState({});
     const [documents, setDocuments] = useState([]);
-    const [loading, setLoading]   = useState(true);
-    const [error, setError]       = useState("");
-    const [success, setSuccess]   = useState("");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({});
+    const [showModal, setShowModal] = useState(false);
 
-    const loadProfile = useCallback(async () => {
+    const loadParticipantProfile = useCallback(async () => {
         try {
-            setLoading(true);
-            if (!userId) { setError("User ID not available"); setLoading(false); return; }
-            const profileData = await getParticipantById(userId);
+            const profileData = await getParticipantByUserId(currentUserId);
             setProfile(profileData);
-            setFormData(profileData);
-            const docsData = await getParticipantDocuments(userId);
-            setDocuments(docsData || []);
+
+            let parsedPhone = "";
+            let parsedEmail = "";
+            let parsedOther = "";
+
+            if (profileData.contactInfo) {
+                try {
+                    const parsedContact = JSON.parse(profileData.contactInfo);
+                    parsedPhone = parsedContact.phone || "";
+                    parsedEmail = parsedContact.email || "";
+                    parsedOther = parsedContact.other || "";
+                } catch (e) {
+                    parsedPhone = profileData.contactInfo;
+                }
+            }
+
+            setFormData({
+                legalName: profileData.legalName || "",
+                address: profileData.address || "",
+                phone: parsedPhone,
+                email: parsedEmail,
+                otherContact: parsedOther
+            });
+
+            const actualParticipantId = profileData.id || profileData.participantId;
+            if (actualParticipantId) {
+                const docsData = await getParticipantDocuments(actualParticipantId);
+                setDocuments(docsData || []);
+            }
             setError("");
         } catch (err) {
-            setError(err.response?.data?.message || "Failed to load profile");
+            setError(err.response?.data?.message || "Failed to load participant profile.");
         } finally {
             setLoading(false);
         }
-    }, [userId]);
+    }, [currentUserId]);
 
-    useEffect(() => { if (userId) loadProfile(); }, [userId, loadProfile]);
+    useEffect(() => {
+        if (!token) {
+            setError("User data not found. Please log in again.");
+            setLoading(false);
+            return;
+        }
 
-    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+        if (user.isAdmin) {
+            setProfileType("ADMIN");
+            setProfile({
+                legalName: user.username || "System Admin",
+                entityType: "ADMIN",
+                designation: "SYSTEM ADMINISTRATOR",
+                status: "ACTIVE_STAFF"
+            });
+            setLoading(false);
+            return;
+        }
 
-    const handleSave = async () => {
         try {
-            setLoading(true);
-            await updateParticipant(userId, formData);
-            setProfile(formData);
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const roles = payload.roles || [];
+            const authorities = payload.authorities || [];
+            const tokenUsername = payload.sub || user.username;
+
+            if (roles.includes("ROLE_OFFICER") || roles.includes("OFFICER")) {
+                setProfileType("OFFICER");
+                setProfile({
+                    legalName: tokenUsername,
+                    entityType: "OFFICER",
+                    designation: authorities.length > 0 ? authorities.join(", ") : "GOVERNMENT OFFICER",
+                    status: "ACTIVE_STAFF"
+                });
+                setLoading(false);
+            } else {
+                setProfileType("CITIZEN");
+                loadParticipantProfile();
+            }
+        } catch (e) {
+            setProfileType("CITIZEN");
+            loadParticipantProfile();
+        }
+    }, [token, user.isAdmin, user.username, loadParticipantProfile]);
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
+
+    const handleSaveProfile = async () => {
+        if (!formData.legalName || !formData.address || (!formData.phone && !formData.email)) {
+            setError("Please fill in all mandatory fields.");
+            return;
+        }
+
+        try {
+            const contactJson = JSON.stringify({
+                phone: formData.phone,
+                email: formData.email,
+                other: formData.otherContact
+            });
+
+            await updateParticipant(profile.id, {
+                legalName: formData.legalName,
+                address: formData.address,
+                contactInfo: contactJson 
+            });
             setEditMode(false);
-            setSuccess("Profile updated successfully.");
+            loadParticipantProfile();
             setError("");
         } catch (err) {
             setError(err.response?.data?.message || "Failed to update profile");
-        } finally {
-            setLoading(false);
         }
     };
 
-    const docBadge = (status) =>
-        status === "VERIFIED" ? "bg-success" : status === "REJECTED" ? "bg-danger" : "bg-warning text-dark";
+    const handleViewDocument = (base64Data) => {
+        if (!base64Data) return;
+        let fileSource = base64Data;
+        if (!base64Data.startsWith("data:")) {
+            const isPdf = base64Data.startsWith("JVBERi"); 
+            const mimeType = isPdf ? "application/pdf" : "image/png";
+            fileSource = `data:${mimeType};base64,${base64Data}`;
+        }
+        const newWindow = window.open();
+        if (newWindow) {
+            newWindow.document.write(`<iframe src="${fileSource}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+        }
+    };
 
     if (loading) return <Loading />;
 
+    const isInternalUser = profileType === "ADMIN" || profileType === "OFFICER";
+
     return (
         <div>
-            {/* Page header */}
-            <div className="mb-4 pb-3 border-bottom">
-                <h4 className="fw-bold text-success mb-0">My Profile</h4>
-                <p className="text-muted small mb-0">View and update your account information</p>
-            </div>
+            <h2 className="mb-4">My Profile</h2>
 
-            {error   && <Alert message={error}   type="danger" />}
-            {success && <Alert message={success} type="success" />}
+            {error && <Alert message={error} type="danger" />}
 
-            <div className="row g-4">
-                {/* Profile card */}
-                <div className="col-md-6">
-                    <div className="card border-0 shadow-sm h-100">
-                        <div className="card-header bg-success text-white border-0 d-flex align-items-center justify-content-between">
-                            <h6 className="mb-0">Profile Information</h6>
-                            {!editMode && (
-                                <button className="btn btn-sm btn-outline-light" onClick={() => setEditMode(true)}>
-                                    Edit
-                                </button>
-                            )}
+            <div className="row">
+                <div className={`col-md-${isInternalUser ? '12' : '6'} mb-4`}>
+                    <div className="card shadow-sm border-0">
+                        <div className="card-header bg-success text-white">
+                            <h5 className="mb-0">Profile Information</h5>
                         </div>
-                        <div className="card-body p-4">
-                            {editMode ? (
+                        <div className="card-body">
+                            {editMode && !isInternalUser ? (
                                 <>
                                     <div className="mb-3">
-                                        <label htmlFor="pf-legalName" className="form-label small fw-semibold">Legal Name</label>
-                                        <input id="pf-legalName" type="text" className="form-control" name="legalName"
-                                            value={formData.legalName || ""} onChange={handleInputChange} />
+                                        <label className="form-label fw-bold">Legal Name <span className="text-danger">*</span></label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="legalName"
+                                            value={formData.legalName}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
                                     <div className="mb-3">
-                                        <label htmlFor="pf-address" className="form-label small fw-semibold">Address</label>
-                                        <textarea id="pf-address" className="form-control" name="address" rows="2"
-                                            value={formData.address || ""} onChange={handleInputChange} />
+                                        <label className="form-label fw-bold">Address <span className="text-danger">*</span></label>
+                                        <textarea
+                                            className="form-control"
+                                            name="address"
+                                            rows="3"
+                                            value={formData.address}
+                                            onChange={handleInputChange}
+                                        />
                                     </div>
-                                    <div className="d-flex gap-2">
-                                        <button className="btn btn-success btn-sm" onClick={handleSave}>Save</button>
-                                        <button className="btn btn-outline-secondary btn-sm" onClick={() => { setEditMode(false); setFormData(profile); }}>Cancel</button>
+                                    
+                                    <hr className="my-3 text-muted" />
+                                    <h6 className="fw-bold mb-3">Contact Information</h6>
+                                    
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold">Phone Number <span className="text-danger">*</span></label>
+                                        <input
+                                            type="tel"
+                                            className="form-control"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold">Email Address <span className="text-danger">*</span></label>
+                                        <input
+                                            type="email"
+                                            className="form-control"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold">Alternate Contact</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            name="otherContact"
+                                            value={formData.otherContact}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <button className="btn btn-success me-2" onClick={handleSaveProfile}>
+                                            Save Changes
+                                        </button>
+                                        <button className="btn btn-secondary" onClick={() => setEditMode(false)}>
+                                            Cancel
+                                        </button>
                                     </div>
                                 </>
                             ) : (
-                                <table className="table table-sm mb-0">
-                                    <tbody>
-                                        {[
-                                            ["Username", username],
-                                            ["Legal Name", profile.legalName],
-                                            ["Address", profile.address],
-                                            ["Entity Type", profile.entityType],
-                                            ["User ID", userId],
-                                        ].map(([label, value]) => (
-                                            <tr key={label}>
-                                                <td className="text-muted small fw-semibold" style={{ width: 130 }}>{label}</td>
-                                                <td className="small">{value || "—"}</td>
-                                            </tr>
-                                        ))}
-                                        <tr>
-                                            <td className="text-muted small fw-semibold">Verification</td>
-                                            <td>
-                                                <span className={`badge ${profile.status === "VERIFIED" ? "bg-success" : "bg-warning text-dark"}`}>
-                                                    {profile.status || "PENDING"}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <>
+                                    <div className="mb-3">
+                                        <label className="form-label text-muted small mb-0">Role</label>
+                                        <p className="fw-semibold">{profile.entityType || profileType}</p>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label text-muted small mb-0">{isInternalUser ? "Username" : "Legal Name"}</label>
+                                        <p className="fw-semibold">{profile.legalName || "N/A"}</p>
+                                    </div>
+                                    
+                                    {isInternalUser && (
+                                        <div className="mb-3">
+                                            <label className="form-label text-muted small mb-0">Designation / Authorities</label>
+                                            <p className="fw-semibold text-primary">{profile.designation || "N/A"}</p>
+                                        </div>
+                                    )}
+
+                                    {!isInternalUser && (
+                                        <>
+                                            <div className="mb-3">
+                                                <label className="form-label text-muted small mb-0">Phone Number</label>
+                                                <p className="fw-semibold">{formData.phone || "N/A"}</p>
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label text-muted small mb-0">Email</label>
+                                                <p className="fw-semibold">{formData.email || "N/A"}</p>
+                                            </div>
+                                            {formData.otherContact && (
+                                                <div className="mb-3">
+                                                    <label className="form-label text-muted small mb-0">Alternate Contact</label>
+                                                    <p className="fw-semibold">{formData.otherContact}</p>
+                                                </div>
+                                            )}
+                                            <div className="mb-3">
+                                                <label className="form-label text-muted small mb-0">Address</label>
+                                                <p className="fw-semibold">{profile.address || "N/A"}</p>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="mb-4">
+                                        <label className="form-label text-muted small mb-0">Account Status</label>
+                                        <div>
+                                            <span className={`badge bg-${profile.status === "VERIFIED" || profile.status === "ACTIVE_STAFF" ? "success" : profile.status === "REJECTED" ? "danger" : "warning"}`}>
+                                                {profile.status || "PENDING"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    {!isInternalUser && (
+                                        <button className="btn btn-outline-success w-100" onClick={() => setEditMode(true)}>
+                                            Edit Profile
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Roles card */}
-                <div className="col-md-6">
-                    <div className="card border-0 shadow-sm mb-4">
-                        <div className="card-header bg-success text-white border-0">
-                            <h6 className="mb-0">Roles & Permissions</h6>
-                        </div>
-                        <div className="card-body p-4">
-                            <p className="small text-muted mb-2">Assigned Roles</p>
-                            <div className="mb-3">
-                                {roles.length > 0 ? roles.map((r) => (
-                                    <span key={r} className="badge bg-success me-1 mb-1">{r}</span>
-                                )) : <span className="text-muted small">None assigned</span>}
+                {!isInternalUser && (
+                    <div className="col-md-6 mb-4">
+                        <div className="card shadow-sm border-0">
+                            <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h5 className="mb-0">My Documents</h5>
+                                <button className="btn btn-sm btn-success" onClick={() => setShowModal(true)}>
+                                    + Upload
+                                </button>
                             </div>
-                            <p className="small text-muted mb-2">Authorities</p>
-                            <div>
-                                {authorities.length > 0 ? authorities.map((a) => (
-                                    <span key={a} className="badge bg-success bg-opacity-75 me-1 mb-1">{a}</span>
-                                )) : <span className="text-muted small">None assigned</span>}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Documents */}
-                    <div className="card border-0 shadow-sm">
-                        <div className="card-header bg-success text-white border-0">
-                            <h6 className="mb-0">Documents</h6>
-                        </div>
-                        <div className="card-body p-0">
-                            {documents.length === 0 ? (
-                                <p className="text-muted small text-center py-4 mb-0">No documents uploaded</p>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="table table-sm mb-0">
-                                        <thead className="table-light">
-                                            <tr>
-                                                <th className="ps-3 small">Type</th>
-                                                <th className="small">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {documents.map((doc) => (
-                                                <tr key={doc.id}>
-                                                    <td className="ps-3 small">{doc.documentType}</td>
-                                                    <td>
-                                                        <span className={`badge ${docBadge(doc.status)}`}>{doc.status}</span>
-                                                    </td>
+                            <div className="card-body p-0">
+                                {documents.length === 0 ? (
+                                    <div className="p-4 text-center text-muted">
+                                        <p className="mb-0">No documents uploaded yet.</p>
+                                        <small>Upload an ID Proof or License to get verified.</small>
+                                    </div>
+                                ) : (
+                                    <div className="table-responsive">
+                                        <table className="table table-hover align-middle mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th className="ps-3">Type</th>
+                                                    <th>Status</th>
+                                                    <th className="text-end pe-3">Action</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            <div className="p-3">
-                                <button className="btn btn-outline-success btn-sm w-100">Upload Document</button>
+                                            </thead>
+                                            <tbody>
+                                                {documents.map((doc) => (
+                                                    <tr key={doc.id}>
+                                                        <td className="ps-3 fw-semibold">{doc.documentType}</td>
+                                                        <td>
+                                                            <span className={`badge bg-${doc.verificationStatus === "VERIFIED" ? "success" : doc.verificationStatus === "REJECTED" ? "danger" : "warning"}`}>
+                                                                {doc.verificationStatus || doc.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-end pe-3">
+                                                            <button 
+                                                                className="btn btn-sm btn-outline-primary"
+                                                                onClick={() => handleViewDocument(doc.fileUri || doc.fileData)}
+                                                            >
+                                                                View
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
+
+            {!isInternalUser && (
+                <DocumentUploadModal 
+                    show={showModal} 
+                    handleClose={() => setShowModal(false)} 
+                    profileId={profile.id} 
+                    onUploadSuccess={loadParticipantProfile} 
+                />
+            )}
         </div>
     );
 }

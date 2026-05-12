@@ -1,235 +1,370 @@
-import { useState, useEffect } from "react";
-import { createCompliance, getComplianceBySubject, getComplianceByParticipant } from "../api/complianceApi";
+import { useEffect, useState } from "react";
+import {
+  createCompliance,
+  getComplianceBySubject,
+  getProjectSubjects,
+  getProgramSubjects,
+  getIncentiveSubjects,
+} from "../api/complianceApi";
+
 import Loading from "../components/Loading";
 import Alert from "../components/Alert";
-import { RequiredPermission } from "../components/PermissionGate";
+import ContentGate from "../components/ContentGate";
+import ActionButton from "../components/ActionButton";
 import { useAuth } from "../auth/AuthContext";
 
 export default function CompliancePage() {
-    const { getUserId } = useAuth();
-    const [records, setRecords]               = useState([]);
-    const [loading, setLoading]               = useState(false);
-    const [error, setError]                   = useState("");
-    const [success, setSuccess]               = useState("");
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [filterType, setFilterType]         = useState("all");
-    const [filterId, setFilterId]             = useState("");
+  const { getUserId } = useAuth();
 
-    const [formData, setFormData] = useState({
-        subjectType: "PROJECT", subjectId: "", participantId: "",
-        result: "PASS", notes: "", evidenceURL: "",
-    });
+  /* ======================= STATE ======================= */
+  const [records, setRecords] = useState([]);
+  const [subjects, setSubjects] = useState([]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { loadCompliance(); }, []);
+  const [loading, setLoading] = useState(false);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
 
-    const loadCompliance = async () => {
-        try {
-            setLoading(true);
-            if (filterType === "participant" && filterId) {
-                const data = await getComplianceByParticipant(filterId);
-                setRecords(data || []);
-            } else if (filterType === "subject" && filterId) {
-                const data = await getComplianceBySubject(formData.subjectType, filterId);
-                setRecords(data || []);
-            } else {
-                setRecords([]);
-            }
-            setError("");
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to load compliance records");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  // For create form
+  const [formData, setFormData] = useState({
+    subjectType: "PROJECT",
+    subjectId: "",
+    result: "PASS",
+    notes: "",
+    evidenceURL: "",
+  });
 
-    const handleCreate = async (e) => {
-        e.preventDefault();
-        setError(""); setSuccess("");
-        if (!formData.subjectId || !formData.participantId) {
-            setError("Subject ID and Participant ID are required.");
-            return;
-        }
-        try {
-            setLoading(true);
-            await createCompliance(formData, getUserId());
-            setSuccess("Compliance record created successfully.");
-            setFormData({ subjectType: "PROJECT", subjectId: "", participantId: "", result: "PASS", notes: "", evidenceURL: "" });
-            setShowCreateForm(false);
-            loadCompliance();
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to create compliance record");
-        } finally {
-            setLoading(false);
-        }
-    };
+  // For filter
+  const [filter, setFilter] = useState({
+    subjectType: "",
+    subjectId: "",
+  });
 
-    const resultBadge = (result) =>
-        result === "PASS" ? "bg-success" : result === "FAIL" ? "bg-danger" : "bg-warning text-dark";
+  /* ======================= LOAD SUBJECTS ======================= */
 
-    if (loading && records.length === 0) return <Loading />;
+  const loadSubjects = async (type) => {
+    try {
+      setSubjectsLoading(true);
+      let data = [];
 
-    return (
-        <RequiredPermission authority="COMPLIANCE_OFFICER" message="Only Compliance Officers can access this page.">
-            <div>
-                {/* Page header */}
-                <div className="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom">
-                    <div>
-                        <h4 className="fw-bold text-success mb-0">Compliance Management</h4>
-                        <p className="text-muted small mb-0">Create and review compliance records</p>
-                    </div>
-                    <button className="btn btn-success btn-sm" onClick={() => setShowCreateForm(!showCreateForm)}>
-                        {showCreateForm ? "Cancel" : "+ Create Record"}
-                    </button>
-                </div>
+      if (type === "PROJECT") data = await getProjectSubjects();
+      if (type === "PROGRAM") data = await getProgramSubjects();
+      if (type === "INCENTIVE") data = await getIncentiveSubjects();
 
-                {error   && <Alert message={error}   type="danger" />}
-                {success && <Alert message={success} type="success" />}
+      setSubjects(data || []);
+    } catch {
+      setError("Failed to load subjects");
+    } finally {
+      setSubjectsLoading(false);
+    }
+  };
 
-                {/* Create Form */}
-                {showCreateForm && (
-                    <div className="card border-0 shadow-sm mb-4">
-                        <div className="card-header bg-success text-white border-0">
-                            <h6 className="mb-0">Create Compliance Record</h6>
-                        </div>
-                        <div className="card-body p-4">
-                            <form onSubmit={handleCreate}>
-                                <div className="row g-3">
-                                    <div className="col-md-4">
-                                        <label htmlFor="comp-subjectType" className="form-label small fw-semibold">Subject Type</label>
-                                        <select id="comp-subjectType" className="form-select" name="subjectType"
-                                            value={formData.subjectType} onChange={handleInputChange}>
-                                            <option value="PROJECT">Project</option>
-                                            <option value="APPLICATION">Application</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label htmlFor="comp-subjectId" className="form-label small fw-semibold">Subject ID</label>
-                                        <input id="comp-subjectId" type="number" className="form-control" name="subjectId"
-                                            value={formData.subjectId} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label htmlFor="comp-participantId" className="form-label small fw-semibold">Participant ID</label>
-                                        <input id="comp-participantId" type="number" className="form-control" name="participantId"
-                                            value={formData.participantId} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label htmlFor="comp-result" className="form-label small fw-semibold">Result</label>
-                                        <select id="comp-result" className="form-select" name="result"
-                                            value={formData.result} onChange={handleInputChange}>
-                                            <option value="PASS">Pass</option>
-                                            <option value="FAIL">Fail</option>
-                                            <option value="PENDING">Pending</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-md-8">
-                                        <label htmlFor="comp-evidenceURL" className="form-label small fw-semibold">Evidence URL</label>
-                                        <input id="comp-evidenceURL" type="url" className="form-control" name="evidenceURL"
-                                            value={formData.evidenceURL} onChange={handleInputChange}
-                                            placeholder="https://example.com/evidence.pdf" />
-                                    </div>
-                                    <div className="col-12">
-                                        <label htmlFor="comp-notes" className="form-label small fw-semibold">Notes</label>
-                                        <textarea id="comp-notes" className="form-control" name="notes" rows="2"
-                                            value={formData.notes} onChange={handleInputChange} />
-                                    </div>
-                                </div>
-                                <div className="mt-3 d-flex gap-2">
-                                    <button type="submit" className="btn btn-success btn-sm" disabled={loading}>
-                                        {loading ? "Creating..." : "Create Record"}
-                                    </button>
-                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowCreateForm(false)}>Cancel</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
+  // Load subjects for CREATE
+  useEffect(() => {
+    if (!showCreateForm) return;
+    setFormData((p) => ({ ...p, subjectId: "" }));
+    loadSubjects(formData.subjectType);
+  }, [formData.subjectType, showCreateForm]);
 
-                {/* Filter */}
-                <div className="card border-0 shadow-sm mb-4">
-                    <div className="card-header bg-white border-bottom">
-                        <h6 className="mb-0 fw-semibold">Filter Records</h6>
-                    </div>
-                    <div className="card-body p-3">
-                        <div className="row g-3 align-items-end">
-                            <div className="col-md-3">
-                                <label className="form-label small fw-semibold">Filter By</label>
-                                <select className="form-select form-select-sm" value={filterType}
-                                    onChange={(e) => { setFilterType(e.target.value); setFilterId(""); }}>
-                                    <option value="all">All Records</option>
-                                    <option value="participant">Participant ID</option>
-                                    <option value="subject">Subject ID</option>
-                                </select>
-                            </div>
-                            {filterType !== "all" && (
-                                <div className="col-md-3">
-                                    <label className="form-label small fw-semibold">
-                                        {filterType === "participant" ? "Participant ID" : "Subject ID"}
-                                    </label>
-                                    <input type="number" className="form-control form-control-sm" value={filterId}
-                                        onChange={(e) => setFilterId(e.target.value)} placeholder="Enter ID" />
-                                </div>
-                            )}
-                            {filterType !== "all" && filterType === "subject" && (
-                                <div className="col-md-3">
-                                    <label className="form-label small fw-semibold">Subject Type</label>
-                                    <select className="form-select form-select-sm" name="subjectType"
-                                        value={formData.subjectType} onChange={handleInputChange}>
-                                        <option value="PROJECT">Project</option>
-                                        <option value="APPLICATION">Application</option>
-                                    </select>
-                                </div>
-                            )}
-                            <div className="col-md-2">
-                                <button className="btn btn-success btn-sm w-100" onClick={loadCompliance} disabled={loading}>
-                                    Search
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  // Load subjects for FILTER
+  useEffect(() => {
+    if (!filter.subjectType) {
+      setSubjects([]);
+      return;
+    }
+    setFilter((p) => ({ ...p, subjectId: "" }));
+    loadSubjects(filter.subjectType);
+  }, [filter.subjectType]);
 
-                {/* Records Table */}
-                <div className="card border-0 shadow-sm">
-                    <div className="card-header bg-white border-bottom">
-                        <h6 className="mb-0 fw-semibold">Compliance Records</h6>
-                    </div>
-                    <div className="card-body p-0">
-                        {records.length === 0 ? (
-                            <p className="text-muted text-center py-5 mb-0">
-                                {filterType === "all" ? "Use the filter above to search for records" : "No records found"}
-                            </p>
-                        ) : (
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle mb-0">
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th className="ps-4 small">Subject Type</th>
-                                            <th className="small">Subject ID</th>
-                                            <th className="small">Participant ID</th>
-                                            <th className="small">Result</th>
-                                            <th className="small">Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {records.map((r) => (
-                                            <tr key={r.id}>
-                                                <td className="ps-4 small">{r.subjectType}</td>
-                                                <td className="small">{r.subjectId}</td>
-                                                <td className="small">{r.participantId}</td>
-                                                <td><span className={`badge ${resultBadge(r.result)}`}>{r.result}</span></td>
-                                                <td className="small text-muted">{r.notes || "—"}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
+  /* ======================= HANDLERS ======================= */
+
+  const handleFormChange = (e) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const handleFilterChange = (e) =>
+    setFilter({ ...filter, [e.target.name]: e.target.value });
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!formData.subjectId) {
+      setError("Please select a subject");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createCompliance(formData, getUserId());
+      setSuccess("Compliance record created successfully");
+
+      setFormData({
+        subjectType: "PROJECT",
+        subjectId: "",
+        result: "PASS",
+        notes: "",
+        evidenceURL: "",
+      });
+
+      setShowCreateForm(false);
+      setRecords([]);
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Failed to create compliance record"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCompliance = async () => {
+    if (!filter.subjectType || !filter.subjectId) {
+      setRecords([]);
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await getComplianceBySubject(
+        filter.subjectType,
+        filter.subjectId
+      );
+      setRecords(data || []);
+      setError("");
+    } catch {
+      setError("Failed to load compliance records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resultBadge = (result) =>
+    result === "PASS"
+      ? "bg-success"
+      : result === "FAIL"
+      ? "bg-danger"
+      : "bg-warning text-dark";
+
+  if (loading && records.length === 0) return <Loading />;
+
+  /* ======================= UI ======================= */
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+          <h4 className="fw-bold text-success">Compliance Management</h4>
+          <p className="text-muted small mb-0">
+            Create and review compliance records
+          </p>
+        </div>
+        <ActionButton
+          authority="COMPLIANCE_OFFICER"
+          className="btn btn-success btn-sm"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+        >
+          {showCreateForm ? "Cancel" : "+ Create Record"}
+        </ActionButton>
+      </div>
+
+      {error && <Alert message={error} type="danger" />}
+      {success && <Alert message={success} type="success" />}
+
+      {/* ================= CREATE FORM ================= */}
+      <ContentGate authority="COMPLIANCE_OFFICER">
+        {showCreateForm && (
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-success text-white">
+              Create Compliance Record
             </div>
-        </RequiredPermission>
-    );
+            <div className="card-body">
+              <form onSubmit={handleCreate}>
+                <div className="row g-3">
+                  <div className="col-md-4">
+                    <label className="form-label">Subject Type</label>
+                    <select
+                      className="form-select"
+                      name="subjectType"
+                      value={formData.subjectType}
+                      onChange={handleFormChange}
+                    >
+                      <option value="PROJECT">Project</option>
+                      <option value="PROGRAM">Program</option>
+                      <option value="INCENTIVE">Incentive</option>
+                    </select>
+                  </div>
+
+                  <div className="col-md-8">
+                    <label className="form-label">Subject</label>
+                    <select
+                      className="form-select"
+                      name="subjectId"
+                      value={formData.subjectId}
+                      onChange={handleFormChange}
+                      required
+                      disabled={subjectsLoading}
+                    >
+                      <option value="">
+                        {subjectsLoading
+                          ? "Loading subjects..."
+                          : "Select Subject"}
+                      </option>
+                      {subjects.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label">Result</label>
+                    <select
+                      className="form-select"
+                      name="result"
+                      value={formData.result}
+                      onChange={handleFormChange}
+                    >
+                      <option value="PASS">Pass</option>
+                      <option value="FAIL">Fail</option>
+                      <option value="PENDING">Pending</option>
+                    </select>
+                  </div>
+
+                  <div className="col-md-8">
+                    <label className="form-label">Evidence URL</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      name="evidenceURL"
+                      value={formData.evidenceURL}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label">Notes</label>
+                    <textarea
+                      className="form-control"
+                      rows="2"
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 d-flex gap-2">
+                  <button className="btn btn-success btn-sm" type="submit">
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => setShowCreateForm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </ContentGate>
+
+      {/* ================= FILTER ================= */}
+      <div className="card shadow-sm mb-4">
+        <div className="card-header">Filter Compliance</div>
+        <div className="card-body row g-3 align-items-end">
+          <div className="col-md-4">
+            <label className="form-label">Subject Type</label>
+            <select
+              className="form-select form-select-sm"
+              name="subjectType"
+              value={filter.subjectType}
+              onChange={handleFilterChange}
+            >
+              <option value="">Select</option>
+              <option value="PROJECT">Project</option>
+              <option value="PROGRAM">Program</option>
+              <option value="INCENTIVE">Incentive</option>
+            </select>
+          </div>
+
+          <div className="col-md-6">
+            <label className="form-label">Subject</label>
+            <select
+              className="form-select form-select-sm"
+              name="subjectId"
+              value={filter.subjectId}
+              onChange={handleFilterChange}
+              disabled={!filter.subjectType || subjectsLoading}
+            >
+              <option value="">
+                {subjectsLoading
+                  ? "Loading subjects..."
+                  : "Select Subject"}
+              </option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="col-md-2">
+            <button
+              className="btn btn-success btn-sm w-100"
+              onClick={loadCompliance}
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= TABLE ================= */}
+      <div className="card shadow-sm">
+        <div className="card-header">Compliance Records</div>
+        <div className="card-body p-0">
+          {records.length === 0 ? (
+            <p className="text-center text-muted py-4 mb-0">
+              No records found
+            </p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Subject Type</th>
+                    <th>Subject ID</th>
+                    <th>Result</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.subjectType}</td>
+                      <td>{r.subjectId}</td>
+                      <td>
+                        <span className={`badge ${resultBadge(r.result)}`}>
+                          {r.result}
+                        </span>
+                      </td>
+                      <td>{r.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

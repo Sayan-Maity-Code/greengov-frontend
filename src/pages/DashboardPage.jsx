@@ -1,80 +1,84 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { usePermission } from "../hooks/usePermission";
 
 const ALL_SERVICE_CARDS = [
+    {
+        title: "Officers Management",
+        desc: "Verify and manage officer accounts. Approve or reject pending officer registrations.",
+        path: "/officers",
+        requiredAuthority: "ADMIN",
+    },
     {
         title: "Programs",
         desc: "Create and manage environmental programs. Track budget, status, and assigned managers.",
         path: "/programs",
-        requiredAuthority: "PROGRAM_MANAGER",
     },
     {
         title: "Projects",
         desc: "View and manage sustainability projects. Review applications and project milestones.",
         path: "/projects",
-        requiredAuthority: null,   // any authenticated user
     },
     {
         title: "Applications",
         desc: "Submit and track program applications. Manage application status and review outcomes.",
         path: "/applications",
-        requiredAuthority: null,
     },
     {
         title: "Incentives & Disbursements",
         desc: "Process financial incentives for verified participants and track disbursement history.",
         path: "/incentives",
-        requiredAuthority: "DISBURSEMENT_OFFICER",
     },
     {
         title: "Compliance Management",
         desc: "Create compliance records, run checks, and track adherence for projects and applications.",
         path: "/compliance",
-        requiredAuthority: "COMPLIANCE_OFFICER",
     },
     {
         title: "Audit Management",
         desc: "Initiate and manage audit processes based on compliance records.",
         path: "/audit",
-        requiredAuthority: "AUDIT_MANAGER",
     },
     {
         title: "Reports & Analytics",
         desc: "Generate operational reports and view system-wide environmental analytics.",
         path: "/reports",
-        requiredAuthority: null,
     },
     {
         title: "Resource & Infrastructure",
         desc: "Allocate resources, manage infrastructure assets, and update equipment status.",
         path: "/resources",
-        requiredAuthority: "PROGRAM_MANAGER",
     },
 ];
 
 export default function DashboardPage() {
     const navigate = useNavigate();
     const { getUsername, getAuthorities, getRoles } = useAuth();
-    const { isProgramManager } = usePermission();
 
     const username    = getUsername() || "User";
     const authorities = getAuthorities();
     const roles       = getRoles();
+    const isProgramManager = authorities.includes("PROGRAM_MANAGER");
 
-    const canSeeCard = (card) => {
-        if (!card.requiredAuthority) return true;
-        if (card.requiredAuthority === "DISBURSEMENT_OFFICER")
-            return authorities.includes("DISBURSEMENT_OFFICER") || authorities.includes("PROGRAM_MANAGER");
-        return authorities.includes(card.requiredAuthority);
+    // Filter cards based on user permissions
+    const visibleCards = ALL_SERVICE_CARDS.filter(card => {
+        // If card requires specific authority, check it
+        if (card.requiredAuthority) {
+            return authorities.includes(card.requiredAuthority);
+        }
+        // Otherwise show to everyone
+        return true;
+    });
+    
+    const getRoleLabel = () => {
+        if (authorities.includes("ADMIN")) return "Administrator";
+        if (isProgramManager) return "Program Manager";
+        if (authorities.includes("COMPLIANCE_OFFICER")) return "Compliance Officer";
+        if (authorities.includes("AUDIT_MANAGER")) return "Audit Manager";
+        if (authorities.includes("DISBURSEMENT_OFFICER")) return "Disbursement Officer";
+        if (roles.includes("CITIZEN")) return "Citizen";
+        return "User";
     };
-
-    const visibleCards = ALL_SERVICE_CARDS.filter(canSeeCard);
-    const roleLabel    = isProgramManager ? "Program Manager" :
-                         authorities.includes("COMPLIANCE_OFFICER") ? "Compliance Officer" :
-                         authorities.includes("AUDIT_MANAGER")      ? "Audit Manager" :
-                         authorities.includes("DISBURSEMENT_OFFICER") ? "Disbursement Officer" :
-                         roles.includes("CITIZEN") ? "Citizen" : "User";
+    const roleLabel = getRoleLabel();
 
     return (
         <div>

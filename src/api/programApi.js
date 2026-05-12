@@ -12,6 +12,18 @@ export const fetchAllPrograms = async () => {
   return res.data;
 };
 
+// Get program by ID
+export const getProgramById = async (programId) => {
+  const res = await api.get(`/api/programs/fetchById/${programId}`);
+  return res.data;
+};
+
+// Update program (full update)
+export const updateProgram = async (programId, payload) => {
+  const res = await api.put(`/api/programs/updateProgramByID/${programId}`, payload);
+  return res.data;
+};
+
 // Update program status
 export const updateProgramStatus = async (programId, status) => {
   const res = await api.patch(
@@ -22,8 +34,29 @@ export const updateProgramStatus = async (programId, status) => {
   return res.data;
 };
 
-// Get program by ID
-export const getProgramById = async (programId) => {
-  const res = await api.get(`/api/programs/fetchById/${programId}`);
+// Delete program
+export const deleteProgram = async (programId) => {
+  const res = await api.delete(`/api/programs/deleteProgramById/${programId}`);
   return res.data;
 };
+
+// Deduct budget from program
+export const deductBudget = async (programId, amount) => {
+  const res = await api.put(`/api/programs/${programId}/deduct-budget`, {
+    amount
+  });
+  return res.data;
+};
+
+// Check if program exists
+export const programExists = async (programId) => {
+  const res = await api.get(`/api/programs/${programId}/exists`);
+  return res.data;
+};
+
+// Get program report metrics
+export const getProgramReportMetrics = async () => {
+  const res = await api.get("/api/programs/report-metrics");
+  return res.data;
+};
+
