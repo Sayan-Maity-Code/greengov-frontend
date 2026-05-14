@@ -4,7 +4,7 @@ import { fetchAllProjects } from "../api/projectApi";
 import Loading from "../components/Loading";
 import ContentGate from "../components/ContentGate";
 import ActionButton from "../components/ActionButton";
-
+ 
 /* ✅ Toast */
 const Toast = ({ msg, type }) => {
   if (!msg) return null;
@@ -17,34 +17,45 @@ const Toast = ({ msg, type }) => {
     </div>
   );
 };
-
+ 
 export default function ResourcesPage() {
   /* ───────────────── STATE ───────────────── */
   const [tab, setTab] = useState("resources");
   const [resources, setResources] = useState([]);
   const [infra, setInfra] = useState([]);
   const [projects, setProjects] = useState([]);
-
+  const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState({});
   const [mode, setMode] = useState(""); // add | edit | delete
   const [section, setSection] = useState(""); // resource | infra
   const [showModal, setShowModal] = useState(false);
-
+ 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
+ 
   /* ───────────────── LOAD DATA ───────────────── */
   useEffect(() => {
     fetchAllProjects()
       .then(setProjects)
       .catch(() => setError("Failed to load projects"));
   }, []);
-
+ 
   useEffect(() => {
     tab === "resources" ? loadResources() : loadInfra();
   }, [tab]);
-
+ 
+  useEffect(() => {
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError("");
+        setSuccess("");
+      }, 3000); // disappears after 3 sec
+ 
+      return () => clearTimeout(timer);
+    }
+  }, [error, success]);
+ 
   const loadResources = async () => {
     setLoading(true);
     try {
@@ -55,7 +66,7 @@ export default function ResourcesPage() {
       setLoading(false);
     }
   };
-
+ 
   const loadInfra = async () => {
     setLoading(true);
     try {
@@ -66,7 +77,7 @@ export default function ResourcesPage() {
       setLoading(false);
     }
   };
-
+ 
   /* ───────────────── MODAL ───────────────── */
   const openModal = (item = {}, m, sec) => {
     setSelected(item);
@@ -74,7 +85,7 @@ export default function ResourcesPage() {
     setSection(sec);
     setShowModal(true);
   };
-
+ 
   /* ───────────────── SAVE ───────────────── */
   const handleSave = async () => {
     try {
@@ -84,11 +95,11 @@ export default function ResourcesPage() {
           type: selected.type,
           quantity: Number(selected.quantity),
         };
-
+ 
         mode === "add"
           ? await api.allocateResource(payload)
           : await api.updateResource(selected.resourceId, payload);
-
+ 
         loadResources();
       } else {
         const payload = {
@@ -97,38 +108,47 @@ export default function ResourcesPage() {
           location: selected.location,
           capacity: Number(selected.capacity),
         };
-
+ 
         mode === "add"
           ? await api.createInfrastructure(payload)
           : await api.updateInfrastructure(selected.infraId, payload);
-
+ 
         loadInfra();
       }
-
-      setSuccess("Saved ✅");
-    } catch {
-      setError("Save failed ❌");
-    } finally {
+ 
+      setSuccess("Saved Successfully");
+    }
+ 
+    catch (err) {
+      const backendMsg =
+        err?.response?.data?.message || "Something went wrong ❌";
+      setError(backendMsg);
+    }
+ 
+    finally {
       setShowModal(false);
     }
   };
-
+ 
   /* ───────────────── DELETE ───────────────── */
   const handleDelete = async () => {
     try {
       section === "resource"
         ? await api.deleteResource(selected.resourceId)
         : await api.deleteInfrastructure(selected.infraId);
-
+ 
       section === "resource" ? loadResources() : loadInfra();
-      setSuccess("Deleted ✅");
-    } catch {
-      setError("Delete failed ❌");
-    } finally {
+      setSuccess("Deleted Successfully");
+    } catch (err) {
+      const backendMsg =
+        err?.response?.data?.message || "Something went wrong ❌";
+      setError(backendMsg);
+    }
+    finally {
       setShowModal(false);
     }
   };
-
+ 
   /* ───────────────── STATUS ───────────────── */
   const handleStatus = async (item, status) => {
     try {
@@ -139,7 +159,7 @@ export default function ResourcesPage() {
       setError("Status update failed ❌");
     }
   };
-
+ 
   const handleInfraStatus = async (item, status) => {
     try {
       await api.updateInfrastructureStatus({
@@ -152,53 +172,110 @@ export default function ResourcesPage() {
       setError("Status update failed ❌");
     }
   };
-
-  const rows = tab === "resources" ? resources : infra;
+ 
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "Allocated":
+      case "Approved":
+      case "Operational":
+        return "bg-success";
+ 
+      case "Available":
+        return "bg-primary";
+ 
+      case "Planned":
+      case "Under Construction":
+        return "bg-warning text-dark";
+ 
+      case "Depleted":
+        return "bg-danger";
+ 
+      default:
+        return "bg-secondary";
+    }
+  };
+ 
+ 
+  const allRows = tab === "resources" ? resources : infra;
+ 
+  const rows = allRows.filter((item) => {
+    const search = searchText.toLowerCase();
+ 
+    return (
+      item.projectTitle?.toLowerCase().includes(search) ||
+      item.type?.toLowerCase().includes(search) ||
+      item.status?.toLowerCase().includes(search)
+    );
+  });
+ 
   const resourceStatusOptions = ["Available", "Allocated", "Depleted"];
   const infraStatusOptions = ["Planned", "Under Construction", "Operational"];
-
+ 
   /* ───────────────── RENDER ───────────────── */
   return (
     <div className="container py-4">
       <Toast msg={error} type="danger" />
       <Toast msg={success} type="success" />
-
+ 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="text-success mb-0">Resource & Infrastructure</h4>
-
         <ActionButton
           authority="PROGRAM_MANAGER"
-          className="btn btn-success btn-sm"
+          className="btn btn-success px-4 py-2 fw-semibold"
           onClick={() =>
             openModal({}, "add", tab === "resources" ? "resource" : "infra")
           }
         >
+ 
           + Add
         </ActionButton>
       </div>
-
+ 
       {/* Tabs */}
-      <div className="btn-group mb-3">
-        <button
-          className={`btn ${
-            tab === "resources" ? "btn-success" : "btn-outline-success"
-          }`}
-          onClick={() => setTab("resources")}
-        >
-          Resources
-        </button>
-        <button
-          className={`btn ${
-            tab === "infrastructure" ? "btn-success" : "btn-outline-success"
-          }`}
-          onClick={() => setTab("infrastructure")}
-        >
-          Infrastructure
-        </button>
+      <div className="border-bottom mb-3">
+ 
+        <ul className="nav nav-tabs border-0">
+ 
+          {/* ✅ RESOURCES TAB */}
+          <li className="nav-item">
+            <button
+              className={`nav-link ${tab === "resources" ? "active text-success fw-semibold border-success border-bottom border-2" : "text-muted"
+                }`}
+              style={{ border: "none", background: "none" }}
+              onClick={() => setTab("resources")}
+            >
+              Resources
+            </button>
+          </li>
+ 
+          {/* ✅ INFRA TAB */}
+          <li className="nav-item">
+            <button
+              className={`nav-link ${tab === "infrastructure" ? "active text-success fw-semibold border-success border-bottom border-2" : "text-muted"
+                }`}
+              style={{ border: "none", background: "none" }}
+              onClick={() => setTab("infrastructure")}
+            >
+              Infrastructure
+            </button>
+          </li>
+ 
+        </ul>
       </div>
-
+ 
+ 
+      <div className="d-flex justify-content-end mb-3">
+        <input
+          type="text"
+          className="form-control w-25"
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
+ 
       {loading && <Loading />}
-
+ 
       {/* Table */}
       {!loading && (
         <table className="table table-hover">
@@ -219,14 +296,14 @@ export default function ResourcesPage() {
               <th>Actions</th>
             </tr>
           </thead>
-
+ 
           <tbody>
             {rows.map((item) => (
               <tr key={item.resourceId || item.infraId}>
                 <td>{item.resourceId || item.infraId}</td>
                 <td>{item.projectTitle}</td>
                 <td>{item.type}</td>
-
+ 
                 {tab === "resources" ? (
                   <td>{item.quantity}</td>
                 ) : (
@@ -235,63 +312,78 @@ export default function ResourcesPage() {
                     <td>{item.capacity}</td>
                   </>
                 )}
-
-                <td>{item.status}</td>
-
-                <td className="d-flex gap-2">
-                  <ActionButton
-                    authority="PROGRAM_MANAGER"
-                    className="btn btn-sm btn-outline-warning"
-                    onClick={() =>
-                      openModal(
-                        item,
-                        "edit",
-                        tab === "resources" ? "resource" : "infra"
-                      )
-                    }
+ 
+ 
+                <td>
+                  <span
+                    className={`badge ${getStatusStyle(item.status)} px-3 py-2 text-uppercase`}
+                    style={{
+                      borderRadius: "20px",
+                      fontWeight: "600",
+                      letterSpacing: "0.5px"
+                    }}
                   >
-                    ✏️
-                  </ActionButton>
-
-                  <ContentGate authority="PROGRAM_MANAGER">
-                    <select
-                      className="form-select form-select-sm w-auto"
-                      onChange={(e) =>
-                        tab === "resources"
-                          ? handleStatus(item, e.target.value)
-                          : handleInfraStatus(item, e.target.value)
+                    {item.status}
+                  </span>
+                </td>
+ 
+ 
+                <td>
+                  <div className="d-flex align-items-center gap-2">
+                    <ActionButton
+                      authority="PROGRAM_MANAGER"
+                      className="btn btn-sm btn-outline-warning"
+                      onClick={() =>
+                        openModal(
+                          item,
+                          "edit",
+                          tab === "resources" ? "resource" : "infra"
+                        )
                       }
                     >
-                      <option>Status</option>
-                      {(tab === "resources"
-                        ? resourceStatusOptions
-                        : infraStatusOptions
-                      ).map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </ContentGate>
-
-                  <ActionButton
-                    authority="PROGRAM_MANAGER"
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() =>
-                      openModal(
-                        item,
-                        "delete",
-                        tab === "resources" ? "resource" : "infra"
-                      )
-                    }
-                  >
-                    🗑️
-                  </ActionButton>
+                      ✏️
+                    </ActionButton>
+ 
+                    <ContentGate authority="PROGRAM_MANAGER">
+                      <select
+                        className="form-select form-select-sm w-auto"
+                        onChange={(e) =>
+                          tab === "resources"
+                            ? handleStatus(item, e.target.value)
+                            : handleInfraStatus(item, e.target.value)
+                        }
+                      >
+                        <option>Status</option>
+                        {(tab === "resources"
+                          ? resourceStatusOptions
+                          : infraStatusOptions
+                        ).map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </ContentGate>
+ 
+                    <ActionButton
+                      authority="PROGRAM_MANAGER"
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() =>
+                        openModal(
+                          item,
+                          "delete",
+                          tab === "resources" ? "resource" : "infra"
+                        )
+                      }
+                    >
+                      🗑️
+                    </ActionButton>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-
+ 
       {/* Modal */}
       {showModal && (
         <>
@@ -308,7 +400,7 @@ export default function ResourcesPage() {
                     onClick={() => setShowModal(false)}
                   />
                 </div>
-
+ 
                 <div className="modal-body">
                   {mode === "delete" ? (
                     <p>Are you sure you want to delete?</p>
@@ -331,16 +423,35 @@ export default function ResourcesPage() {
                           </option>
                         ))}
                       </select>
-
-                      <input
+ 
+ 
+                      <select
                         className="form-control mb-2"
-                        placeholder="Type"
                         value={selected.type || ""}
                         onChange={(e) =>
                           setSelected({ ...selected, type: e.target.value })
                         }
-                      />
-
+                      >
+                        <option value="">Select Type</option>
+ 
+                        {/* ✅ RESOURCE TYPES */}
+                        {section === "resource" ? (
+                          <>
+                            <option value="Funds">Funds</option>
+                            <option value="Equipment">Equipment</option>
+                          </>
+                        ) : (
+                          /* ✅ INFRA TYPES */
+                          <>
+                            <option value="SolarPlant">SolarPlant</option>
+                            <option value="WindFarm">WindFarm</option>
+                            <option value="RecyclingUnit">RecyclingUnit</option>
+                          </>
+                        )}
+ 
+                      </select>
+ 
+ 
                       {section === "resource" ? (
                         <input
                           className="form-control"
@@ -382,7 +493,7 @@ export default function ResourcesPage() {
                     </>
                   )}
                 </div>
-
+ 
                 <div className="modal-footer">
                   <button
                     className="btn btn-secondary"
@@ -390,7 +501,7 @@ export default function ResourcesPage() {
                   >
                     Cancel
                   </button>
-
+ 
                   {mode === "delete" ? (
                     <button className="btn btn-danger" onClick={handleDelete}>
                       Delete
@@ -409,3 +520,4 @@ export default function ResourcesPage() {
     </div>
   );
 }
+ 
