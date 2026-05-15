@@ -52,7 +52,7 @@ const ALL_SERVICE_CARDS = [
     title: "Resource & Infrastructure",
     desc: "Allocate resources, manage infrastructure assets, and update equipment status.",
     path: "/resources",
-    authority: "ADMIN",
+    authorities: ["ADMIN","PROGRAM_MANAGER"],
   },
 ];
 
