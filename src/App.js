@@ -14,13 +14,10 @@ import ProfilePage from "./pages/ProfilePage";
 import ReportsPage from "./pages/ReportsPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import PrivateRoute from "./auth/PrivateRoute";
+import ProtectedRoute from "./auth/ProtectedRoute";
 import SetupProfilePage from "./pages/SetupProfilePage";
 import OfficersManagementPage from "./pages/OfficersManagementPage";
-import EnvironmentalDashboard from './pages/EnvironmentalDashboard';
-
-// 🚀 Add this import for your secure officer guard!
-import OfficerRoute from "./auth/OfficerRoute"; 
+import EnvironmentalDashboard from './pages/EnvironmentalDashboard'; 
 
 function App() {
   return (
@@ -36,108 +33,111 @@ function App() {
       <Route
         path="/dashboard"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <DashboardPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/setup-profile"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <SetupProfilePage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/programs"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <ProgramsPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/applications"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <ApplicationsPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/projects"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <ProjectsPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/incentives"
         element={
-          <PrivateRoute>
+          <ProtectedRoute 
+            requiredAuthorities={["DISBURSEMENT_OFFICER", "COMPLIANCE_OFFICER"]}
+            requiredRoles={["CITIZEN", "BUSINESS_OWNER"]}
+          >
             <MainLayout>
               <IncentivesPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/compliance"
         element={
-          <PrivateRoute>
+          <ProtectedRoute requiredAuthority="COMPLIANCE_OFFICER">
             <MainLayout>
               <CompliancePage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/audit"
         element={
-          <PrivateRoute>
+          <ProtectedRoute requiredAuthority="AUDIT_MANAGER">
             <MainLayout>
               <AuditPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
       
       <Route
         path="/reports"
         element={
-          <PrivateRoute>
+          <ProtectedRoute requiredAuthorities={["ADMIN", "PROGRAM_MANAGER"]}>
             <MainLayout>
               <ReportsPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/resources"
         element={
-          <PrivateRoute>
+          <ProtectedRoute requiredAuthorities={["ADMIN", "PROGRAM_MANAGER"]}>
             <MainLayout>
               <ResourcesPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
@@ -145,22 +145,22 @@ function App() {
       <Route
         path="/profile"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <MainLayout>
               <ProfilePage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/officers"
         element={
-          <PrivateRoute>
+          <ProtectedRoute requiredAuthority="ADMIN">
             <MainLayout>
               <OfficersManagementPage />
             </MainLayout>
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       />
 
@@ -168,11 +168,11 @@ function App() {
       <Route
         path="/officer-dashboard"
         element={
-          <OfficerRoute>
+          <ProtectedRoute requiredAuthority="ADMIN">
             <MainLayout>
               <EnvironmentalDashboard />
             </MainLayout>
-          </OfficerRoute>
+          </ProtectedRoute>
         }
       />
 
