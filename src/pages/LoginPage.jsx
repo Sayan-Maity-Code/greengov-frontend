@@ -162,12 +162,20 @@ export default function LoginPage() {
                         </form>
                     </div>
 
-                    <p className="text-center text-muted small mt-3">
-                        Don't have an account?{" "}
-                        <Link to="/register" className="text-success text-decoration-none fw-semibold">
-                            Register here
-                        </Link>
-                    </p>
+                    <div className="text-center text-muted small mt-3">
+                        <p className="mb-2">
+                            Don't have an account?{" "}
+                            <Link to="/register" className="text-success text-decoration-none fw-semibold">
+                                Register here
+                            </Link>
+                        </p>
+                        <p className="mb-0">
+                            Forgot your password?{" "}
+                            <Link to="/forgot-password" className="text-success text-decoration-none fw-semibold">
+                                Reset here
+                            </Link>
+                        </p>
+                    </div>
                 </div>
             </div>
             <Footer />

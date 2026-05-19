@@ -29,3 +29,27 @@ export const registerOfficer = async (payload) => {
     });
     return res.data;
 };
+
+// Forgot Password - Send OTP
+export const sendForgotPasswordOtp = async (email) => {
+    const res = await api.post("/api/auth/forgot-password/send-otp", null, {
+        params: { email }
+    });
+    return res.data;
+};
+
+// Forgot Password - Verify OTP
+export const verifyForgotPasswordOtp = async (email, otp) => {
+    const res = await api.post("/api/auth/forgot-password/verify-otp", null, {
+        params: { email, otp }
+    });
+    return res.data;
+};
+
+// Forgot Password - Reset Password
+export const resetPassword = async (email, newPassword) => {
+    const res = await api.post("/api/auth/forgot-password/reset", null, {
+        params: { email, newPassword }
+    });
+    return res.data;
+};

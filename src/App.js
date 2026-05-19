@@ -3,6 +3,7 @@ import MainLayout from "./components/MainLayout";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProgramsPage from "./pages/ProgramsPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
@@ -28,6 +29,7 @@ function App() {
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Protected routes with MainLayout */}
       <Route
@@ -54,7 +56,7 @@ function App() {
       <Route
         path="/programs"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute  >
             <MainLayout>
               <ProgramsPage />
             </MainLayout>
