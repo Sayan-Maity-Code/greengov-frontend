@@ -35,3 +35,8 @@ export const closeAudit = async (auditId, status, auditorUserId) => {
   );
   return res.data;
 };
+
+export const getAllAudits = async()=>{
+  const res = await api.get(`/api/audits/all`);
+  return res.data;
+}

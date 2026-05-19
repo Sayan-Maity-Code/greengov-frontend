@@ -1,5 +1,7 @@
 import { usePermission } from "../hooks/usePermission";
 
+//Protect actions (create, delete, approve)
+
 /**
  * Reusable ActionButton Component
  * Conditionally renders a button based on role/authority requirements

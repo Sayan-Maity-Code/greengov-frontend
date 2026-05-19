@@ -11,7 +11,7 @@ api.interceptors.request.use( //asks two functions success function and error fu
         // Here is the request I’m about to send.You may modify it.
 
         if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+            config.headers.Authorization = `Bearer ${token}`;// adds the token to req for authorization
         }
         return config; // Final modified configuration as per my requirement
     },

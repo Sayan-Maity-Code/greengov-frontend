@@ -14,28 +14,32 @@ import {
 } from "../api/disbursementApi";
 import ContentGate from "../components/ContentGate";
 import { useAuth } from "../auth/AuthContext";
-
+import { getParticipantById } from "../api/participantApi";
+import { getProgramById } from "../api/programApi";
+ 
 export default function IncentivesPage() {
   const { getUserId } = useAuth();
   const officerUserId = getUserId();
-
+ 
   const [activeTab, setActiveTab] = useState("list");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
+ 
   // ===============================
   // LIST TAB
   // ===============================
   const [incentives, setIncentives] = useState([]);
-
+  const [beneficiaryNames, setBeneficiaryNames] = useState({});
+  const [programNames, setProgramNames] = useState({});
+ 
   // ===============================
   // CREATE TAB
   // ===============================
   const [participants, setParticipants] = useState([]);
   const [selectedParticipant, setSelectedParticipant] = useState("");
   const [createAmount, setCreateAmount] = useState("");
-
+ 
   // ===============================
   // DISBURSEMENT TAB
   // ===============================
@@ -45,31 +49,62 @@ export default function IncentivesPage() {
   const [disbLookupIncentiveId, setDisbLookupIncentiveId] = useState("");
   const [disbLookupDisbId, setDisbLookupDisbId] = useState("");
   const [lookedUpDisb, setLookedUpDisb] = useState(null);
-
+ 
   const clearMessages = () => {
     setError("");
     setSuccess("");
   };
-
+ 
   // ===============================
   // LOAD INCENTIVES
   // ===============================
   useEffect(() => {
     if (activeTab === "list") loadIncentives();
   }, [activeTab]);
-
+ 
   const loadIncentives = async () => {
     try {
       setLoading(true);
       const data = await fetchAllIncentives();
       setIncentives(Array.isArray(data) ? data : []);
+ 
+      // Fetch beneficiary and program names
+      const newBeneficiaryNames = { ...beneficiaryNames };
+      const newProgramNames = { ...programNames };
+ 
+      if (Array.isArray(data)) {
+        for (const incentive of data) {
+          // Fetch beneficiary name if not cached
+          if (incentive.beneficiaryId && !newBeneficiaryNames[incentive.beneficiaryId]) {
+            try {
+              const beneficiary = await getParticipantById(incentive.beneficiaryId);
+              newBeneficiaryNames[incentive.beneficiaryId] = beneficiary.legalName || "N/A";
+            } catch {
+              newBeneficiaryNames[incentive.beneficiaryId] = "N/A";
+            }
+          }
+ 
+          // Fetch program name if not cached
+          if (incentive.programId && !newProgramNames[incentive.programId]) {
+            try {
+              const program = await getProgramById(incentive.programId);
+              newProgramNames[incentive.programId] = program.title || "N/A";
+            } catch {
+              newProgramNames[incentive.programId] = "N/A";
+            }
+          }
+        }
+ 
+        setBeneficiaryNames(newBeneficiaryNames);
+        setProgramNames(newProgramNames);
+      }
     } catch {
       setError("Failed to load incentives");
     } finally {
       setLoading(false);
     }
   };
-
+ 
   // ===============================
   // LOAD PARTICIPANTS WHEN CREATE TAB OPENS
   // ===============================
@@ -82,24 +117,24 @@ export default function IncentivesPage() {
         .finally(() => setLoading(false));
     }
   }, [activeTab]);
-
+ 
   // ===============================
   // CREATE INCENTIVE
   // ===============================
   const handleCreateIncentive = async (e) => {
     e.preventDefault();
     clearMessages();
-
+ 
     if (!selectedParticipant) {
       setError("Please select a participant");
       return;
     }
-
+ 
     if (!createAmount || Number(createAmount) <= 0) {
       setError("Please enter a valid amount");
       return;
     }
-
+ 
     try {
       setLoading(true);
       await createIncentive(
@@ -119,13 +154,13 @@ export default function IncentivesPage() {
       setLoading(false);
     }
   };
-
+ 
   // ===============================
   // DELETE INCENTIVE
   // ===============================
   const handleDelete = async (incentiveId) => {
     if (!window.confirm(`Delete incentive #${incentiveId}?`)) return;
-
+ 
     clearMessages();
     try {
       setLoading(true);
@@ -138,24 +173,24 @@ export default function IncentivesPage() {
       setLoading(false);
     }
   };
-
+ 
   // ===============================
   // CREATE DISBURSEMENT
   // ===============================
   const handleCreateDisbursement = async (e) => {
     e.preventDefault();
     clearMessages();
-
+ 
     if (!selectedIncentiveForDisb) {
       setError("Please select an incentive");
       return;
     }
-
+ 
     if (!disbAmount || Number(disbAmount) <= 0) {
       setError("Please enter a valid amount");
       return;
     }
-
+ 
     try {
       setLoading(true);
       await createDisbursement(
@@ -178,7 +213,7 @@ export default function IncentivesPage() {
       setLoading(false);
     }
   };
-
+ 
   // ===============================
   // GET DISBURSEMENT HISTORY
   // ===============================
@@ -193,24 +228,24 @@ export default function IncentivesPage() {
       setLoading(false);
     }
   };
-
+ 
   const handleLoadDisbursementHistory = async (incentiveId) => {
     clearMessages();
     setSelectedIncentiveForDisb(incentiveId);
     await loadDisbursementHistory(incentiveId);
   };
-
+ 
   // ===============================
   // GET DISBURSEMENT BY IDS
   // ===============================
   const handleFetchDisbByIds = async () => {
     clearMessages();
-
+ 
     if (!disbLookupIncentiveId || !disbLookupDisbId) {
       setError("Please enter both incentive ID and disbursement ID");
       return;
     }
-
+ 
     try {
       setLoading(true);
       const data = await getDisbursementByIds(
@@ -225,7 +260,7 @@ export default function IncentivesPage() {
       setLoading(false);
     }
   };
-
+ 
   // ===============================
   // RENDER UI
   // ===============================
@@ -233,9 +268,9 @@ export default function IncentivesPage() {
     <div className="p-4">
       {error && <Alert message={error} type="danger" />}
       {success && <Alert message={success} type="success" />}
-
+ 
       {loading && <Loading />}
-
+ 
       <ul className="nav nav-tabs mb-4">
         {["list", "create", "disbursements"].map((tab) => (
           <li className="nav-item" key={tab}>
@@ -253,7 +288,7 @@ export default function IncentivesPage() {
           </li>
         ))}
       </ul>
-
+ 
       {/* ========== LIST TAB ========== */}
       {activeTab === "list" && (
         <div>
@@ -281,8 +316,8 @@ export default function IncentivesPage() {
                     <tr key={incentive.incentiveId}>
                       <td className="fw-semibold">{incentive.incentiveId}</td>
                       <td>{incentive.applicationId}</td>
-                      <td>{incentive.beneficiaryId}</td>
-                      <td>{incentive.programId}</td>
+                      <td>{beneficiaryNames[incentive.beneficiaryId] || "Loading..."}</td>
+                      <td>{programNames[incentive.programId] || "Loading..."}</td>
                       <td>₹{incentive.amount.toLocaleString()}</td>
                       <td>₹{incentive.remainingAmount.toLocaleString()}</td>
                       <td>
@@ -302,16 +337,6 @@ export default function IncentivesPage() {
                       </td>
                       <td>{incentive.sanctionedDate}</td>
                       <td>
-                        <button
-                          className="btn btn-sm btn-info me-2"
-                          onClick={() =>
-                            handleLoadDisbursementHistory(
-                              incentive.incentiveId
-                            )
-                          }
-                        >
-                          View History
-                        </button>
                         <ContentGate authority="DISBURSEMENT_OFFICER">
                           <button
                             className="btn btn-sm btn-danger"
@@ -331,7 +356,7 @@ export default function IncentivesPage() {
           )}
         </div>
       )}
-
+ 
       {/* ========== CREATE TAB ========== */}
       {activeTab === "create" && (
         <ContentGate authority="DISBURSEMENT_OFFICER">
@@ -355,7 +380,7 @@ export default function IncentivesPage() {
                     ))}
                   </select>
                 </div>
-
+ 
                 <div className="mb-3">
                   <label className="form-label">Incentive Amount</label>
                   <input
@@ -369,7 +394,7 @@ export default function IncentivesPage() {
                     required
                   />
                 </div>
-
+ 
                 <button type="submit" className="btn btn-success">
                   Create Incentive
                 </button>
@@ -378,7 +403,7 @@ export default function IncentivesPage() {
           </div>
         </ContentGate>
       )}
-
+ 
       {/* ========== DISBURSEMENTS TAB ========== */}
       {activeTab === "disbursements" && (
         <ContentGate authority="DISBURSEMENT_OFFICER">
@@ -410,7 +435,7 @@ export default function IncentivesPage() {
                         ))}
                       </select>
                     </div>
-
+ 
                     <div className="mb-3">
                       <label className="form-label">Disbursement Amount</label>
                       <input
@@ -424,7 +449,7 @@ export default function IncentivesPage() {
                         required
                       />
                     </div>
-
+ 
                     <button type="submit" className="btn btn-success">
                       Create Disbursement
                     </button>
@@ -432,7 +457,7 @@ export default function IncentivesPage() {
                 </div>
               </div>
             </div>
-
+ 
             {/* Disbursement History */}
             <div className="col-md-6 mb-4">
               <div className="card">
@@ -443,7 +468,7 @@ export default function IncentivesPage() {
                       Showing history for Incentive #{selectedIncentiveForDisb}
                     </p>
                   )}
-
+ 
                   {disbHistory.length === 0 ? (
                     <p className="text-muted">
                       {selectedIncentiveForDisb
@@ -481,7 +506,7 @@ export default function IncentivesPage() {
                 </div>
               </div>
             </div>
-
+ 
             {/* Lookup Disbursement by IDs */}
             <div className="col-md-12 mb-4">
               <div className="card">
@@ -520,7 +545,7 @@ export default function IncentivesPage() {
                       </button>
                     </div>
                   </div>
-
+ 
                   {lookedUpDisb && (
                     <div className="mt-3 p-3 bg-light border rounded">
                       <h6>Result:</h6>
@@ -564,4 +589,3 @@ export default function IncentivesPage() {
   );
 }
  
-

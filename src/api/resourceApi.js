@@ -32,6 +32,11 @@ export const updateResourceStatus = async (resourceId, status) => {
   return res.data;
 };
 
+export const getAllResources = async () => {
+  const res = await api.get("/api/resources/get-all");
+  return res.data;
+}
+
 // ── Infrastructure ──────────────────────────────────────────
 
 // Create infrastructure
@@ -55,5 +60,17 @@ export const getInfrastructureById = async (infraId) => {
 // Delete infrastructure by ID
 export const deleteInfrastructure = async (infraId) => {
   const res = await api.delete(`/api/infrastructure/${infraId}`);
+  return res.data;
+};
+
+
+export const updateInfrastructure = async (infraId, payload) => {
+  const res = await api.put(`/api/infrastructure/${infraId}`, payload);
+  return res.data;
+};
+
+
+export const updateInfrastructureStatus = async (payload) => {
+  const res = await api.patch("/api/infrastructure/status", payload);
   return res.data;
 };

@@ -6,7 +6,7 @@ import Loading from "../components/Loading";
 import Alert from "../components/Alert";
 import ActionButton from "../components/ActionButton";
 import ContentGate from "../components/ContentGate";
-
+ 
 export default function ApplicationsPage() {
     const { userId } = useAuth();
     const [applications, setApplications] = useState([]);
@@ -16,16 +16,16 @@ export default function ApplicationsPage() {
     const [success, setSuccess] = useState("");
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [actionLoading, setActionLoading] = useState(null);
-
-    const [formData, setFormData] = useState({ 
+ 
+    const [formData, setFormData] = useState({
         programId: "",
     });
-
-    useEffect(() => { 
+ 
+    useEffect(() => {
         loadApplications();
         loadPrograms();
     }, []);
-
+ 
     const loadApplications = async () => {
         try {
             setLoading(true);
@@ -38,7 +38,7 @@ export default function ApplicationsPage() {
             setLoading(false);
         }
     };
-
+ 
     const loadPrograms = async () => {
         try {
             const data = await fetchAllPrograms();
@@ -47,19 +47,19 @@ export default function ApplicationsPage() {
             console.error("Failed to load programs:", err);
         }
     };
-
+ 
     const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
+ 
     const handleApplyForProgram = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess("");
-        
+       
         if (!formData.programId) {
             setError("Please select a program");
             return;
         }
-
+ 
         try {
             setLoading(true);
             await applyForProgram(userId, Number.parseInt(formData.programId, 10));
@@ -74,7 +74,7 @@ export default function ApplicationsPage() {
             setLoading(false);
         }
     };
-
+ 
     const handleApproveApplication = async (appId) => {
         setActionLoading(appId);
         setError("");
@@ -89,7 +89,7 @@ export default function ApplicationsPage() {
             setActionLoading(null);
         }
     };
-
+ 
     const handleRejectApplication = async (appId) => {
         setActionLoading(appId);
         setError("");
@@ -104,12 +104,12 @@ export default function ApplicationsPage() {
             setActionLoading(null);
         }
     };
-
+ 
     const statusBadge = (s) =>
         s === "APPROVED" ? "bg-success" : s === "REJECTED" ? "bg-danger" : "bg-warning text-dark";
-
+ 
     if (loading && applications.length === 0) return <Loading />;
-
+ 
     return (
         <div>
             {/* Page header */}
@@ -118,19 +118,12 @@ export default function ApplicationsPage() {
                     <h4 className="fw-bold text-success mb-0">Applications</h4>
                     <p className="text-muted small mb-0">Submit and track your program applications</p>
                 </div>
-                <ActionButton
-                    roles={["CITIZEN", "BUSINESS_OWNER"]}
-                    className="btn btn-success btn-sm"
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                    title="Citizen or Business Owner can apply"
-                >
-                    {showCreateForm ? "Cancel" : "+ New Application"}
-                </ActionButton>
+                
             </div>
-
+ 
             {error   && <Alert message={error}   type="danger" />}
             {success && <Alert message={success} type="success" />}
-
+ 
             {/* Create Form — only for citizens/businesses */}
             <ContentGate roles={["CITIZEN", "BUSINESS_OWNER"]}>
                 {showCreateForm && (
@@ -179,7 +172,7 @@ export default function ApplicationsPage() {
                     </div>
                 )}
             </ContentGate>
-
+ 
             {/* Stats */}
             <div className="row g-3 mb-4">
                 <div className="col-md-3">
@@ -221,7 +214,7 @@ export default function ApplicationsPage() {
                     </div>
                 </div>
             </div>
-
+ 
             {/* Table */}
             <div className="card border-0 shadow-sm">
                 <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
@@ -249,9 +242,9 @@ export default function ApplicationsPage() {
                                 <tbody>
                                     {applications.map((a) => (
                                         <tr key={a.applicationId}>
-                                            <td className="ps-4 small fw-semibold">#{a.applicationId}</td>
-                                            <td className="small">Program #{a.programId}</td>
-                                            <td className="small">#{a.applicantId}</td>
+                                            <td className="ps-4 small fw-semibold">{a.applicationId}</td>
+                                            <td className="small">{a.programTitle}</td>
+                                            <td className="small">{a.applicantId}</td>
                                             <td className="small text-muted">
                                                 {a.submittedDate ? new Date(a.submittedDate).toLocaleDateString() : "—"}
                                             </td>
@@ -299,3 +292,5 @@ export default function ApplicationsPage() {
         </div>
     );
 }
+ 
+ 

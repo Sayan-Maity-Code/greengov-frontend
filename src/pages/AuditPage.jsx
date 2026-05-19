@@ -5,6 +5,7 @@ import {
   getAuditsByComplianceId,
   closeAudit,
   getComplianceLookup,
+  getAllAudits,
 } from "../api/auditApi";
 
 import Loading from "../components/Loading";
@@ -65,7 +66,11 @@ export default function AuditPage() {
 
       if (filter.type === "status" && filter.value) {
         data = await getAuditsByStatus(filter.value);
-      } else if (filter.type === "compliance" && filter.value) {
+      } 
+      else if(filter.type === "all"){
+        data = await getAllAudits();
+      }
+      else if (filter.type === "compliance" && filter.value) {
         data = await getAuditsByComplianceId(filter.value);
       }
 
@@ -92,16 +97,30 @@ export default function AuditPage() {
 
     try {
       setLoading(true);
+      const auditorId = getUserId();
+      
+      if (!auditorId) {
+        setError("User ID not found. Please log in again.");
+        return;
+      }
+
+      console.log("Creating audit with:", {
+        complianceId: Number.parseInt(formData.complianceId, 10),
+        auditorUserId: auditorId
+      });
+
       await createAudit(
-        { complianceId: formData.complianceId },
-        getUserId()
+        { complianceId: Number.parseInt(formData.complianceId, 10) },
+        auditorId
       );
       setSuccess("Audit created successfully");
       setFormData({ complianceId: "" });
       setShowCreateForm(false);
       loadAudits();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create audit");
+      console.error("Audit creation error:", err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.msg || "Failed to create audit";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
